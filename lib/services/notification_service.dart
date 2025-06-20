@@ -118,9 +118,9 @@ class NotificationService extends ChangeNotifier {
       // Load preferences first
       await _loadPreferences();
       
-      // Initialize notification plugin with minimal settings
+      // Initialize notification plugin with custom app icon
       const AndroidInitializationSettings androidInitializationSettings =
-          AndroidInitializationSettings('@mipmap/launcher_icon');
+          AndroidInitializationSettings('@drawable/ic_notification');
       
       const DarwinInitializationSettings iosInitializationSettings =
           DarwinInitializationSettings(
@@ -725,6 +725,8 @@ class NotificationService extends ChangeNotifier {
             importance: Importance.high,
             priority: Priority.high,
             autoCancel: false,
+            icon: '@drawable/ic_notification', // Use optimized notification icon
+            largeIcon: DrawableResourceAndroidBitmap('@mipmap/launcher_icon'), // Use full-color app icon
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -909,6 +911,8 @@ class NotificationService extends ChangeNotifier {
             channelDescription: 'Test notifications',
             importance: Importance.high,
             priority: Priority.high,
+            icon: '@drawable/ic_notification', // Use optimized notification icon
+            largeIcon: DrawableResourceAndroidBitmap('@mipmap/launcher_icon'), // Use full-color app icon
           ),
         ),
       );
@@ -931,6 +935,8 @@ class NotificationService extends ChangeNotifier {
             channelDescription: 'Test scheduled notifications',
             importance: Importance.high,
             priority: Priority.high,
+            icon: '@drawable/ic_notification', // Use optimized notification icon
+            largeIcon: DrawableResourceAndroidBitmap('@mipmap/launcher_icon'), // Use full-color app icon
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
