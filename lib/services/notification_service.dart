@@ -819,16 +819,33 @@ class NotificationService extends ChangeNotifier {
   
   // Helper method to get day number from day name
   int _getDayNumber(String day) {
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    // Handle both full names and abbreviations
+    const dayAbbreviations = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    
+    // First check for abbreviations (used by reminder editor)
+    int index = dayAbbreviations.indexOf(day);
+    if (index != -1) {
+      return index + 1; // Convert to weekday (1-7)
+    }
+    
+    // Then check for full names
+    index = dayNames.indexOf(day);
+    if (index != -1) {
+      return index + 1; // Convert to weekday (1-7)
+    }
+    
+    // Handle partial matches
     if (day.length >= 3) {
-      for (int i = 0; i < days.length; i++) {
-        if (days[i].startsWith(day) || day.startsWith(days[i].substring(0, 3))) {
+      for (int i = 0; i < dayNames.length; i++) {
+        if (dayNames[i].toLowerCase().startsWith(day.toLowerCase()) || 
+            dayAbbreviations[i].toLowerCase().startsWith(day.toLowerCase())) {
           return i + 1;
         }
       }
     }
-    return days.indexOf(day) + 1;
+    
+    debugPrint('⚠️ Could not parse day: $day');
+    return 1; // Default to Monday if parsing fails
   }
   
   // Add this method to test notification sounds

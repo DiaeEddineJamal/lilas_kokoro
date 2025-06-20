@@ -7,6 +7,7 @@ import '../models/user_model.dart';
 import '../services/data_service.dart';
 import '../services/notification_service.dart';
 import '../services/theme_service.dart';
+import '../services/skeleton_service.dart';
 import '../widgets/gradient_app_bar.dart';
 
 class ReminderEditorScreen extends StatefulWidget {
@@ -128,46 +129,52 @@ class _ReminderEditorScreenState extends State<ReminderEditorScreen> {
     try {
       final userId = Provider.of<UserModel>(context, listen: false).id;
       final dataService = Provider.of<DataService>(context, listen: false);
+      final skeletonService = Provider.of<SkeletonService>(context, listen: false);
       
-      // Combine date and time
-      final dateTime = DateTime(
-        _selectedDate.year,
-        _selectedDate.month,
-        _selectedDate.day,
-        _selectedTime.hour,
-        _selectedTime.minute,
-      );
+      // Use skeleton service for quick toggle operation
+      await skeletonService.withQuickToggle(() async {
+        // Combine date and time
+        final dateTime = DateTime(
+          _selectedDate.year,
+          _selectedDate.month,
+          _selectedDate.day,
+          _selectedTime.hour,
+          _selectedTime.minute,
+        );
 
-      final reminder = Reminder(
-        id: widget.existingReminder?.id ?? const Uuid().v4(),
-        title: _titleController.text,
-        description: _descriptionController.text,
-        dateTime: dateTime,
-        isCompleted: widget.existingReminder?.isCompleted ?? false,
-        userId: userId,
-        emoji: _selectedEmoji,
-        category: _selectedCategory,
-        isRepeating: _isRepeating,
-        repeatDays: _selectedDays,
-      );
+        final reminder = Reminder(
+          id: widget.existingReminder?.id ?? const Uuid().v4(),
+          title: _titleController.text,
+          description: _descriptionController.text,
+          dateTime: dateTime,
+          isCompleted: widget.existingReminder?.isCompleted ?? false,
+          userId: userId,
+          emoji: _selectedEmoji,
+          category: _selectedCategory,
+          isRepeating: _isRepeating,
+          repeatDays: _selectedDays,
+        );
 
-      if (widget.existingReminder == null) {
-        await dataService.addReminder(reminder);
-      } else {
-        await dataService.updateReminder(reminder);
-      }
+        if (widget.existingReminder == null) {
+          await dataService.addReminder(reminder);
+        } else {
+          await dataService.updateReminder(reminder);
+        }
 
-      // Schedule notification
-      final notificationService = NotificationService();
-      await notificationService.scheduleReminderNotification(reminder);
+        // Schedule notification
+        final notificationService = NotificationService();
+        await notificationService.scheduleReminderNotification(reminder);
+      });
 
       if (mounted) {
         Navigator.pop(context);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving reminder: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving reminder: $e')),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {

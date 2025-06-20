@@ -47,6 +47,10 @@ dependencies:
   url_launcher: ^6.2.4
   # Add generative art backgrounds package
   gen_art_bg: ^0.0.2
+  # Add markdown support for AI replies
+  flutter_markdown: ^0.6.18
+  # Add syntax highlighting for code blocks
+  flutter_highlight: ^0.7.0
 
 dev_dependencies:
   flutter_test:

@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_highlight/flutter_highlight.dart';
+import 'package:flutter_highlight/themes/vs.dart';
+import 'package:flutter_highlight/themes/vs2015.dart';
+import 'package:markdown/markdown.dart' as md;
 import '../models/chat_message_model.dart';
 import '../services/ai_companion_service.dart';
 import '../services/theme_service.dart';
@@ -901,7 +906,7 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
             height: 32, // Slightly smaller
             margin: const EdgeInsets.only(right: 8.0),
             decoration: BoxDecoration(
-              color: colorScheme.primary.withOpacity(0.3),
+              color: colorScheme.primary.withOpacity(0.15), // Elegant opacity with primary color
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Center(
@@ -927,18 +932,35 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
                 vertical: _isKeyboardVisible ? 8.0 : 12.0, // Reduce padding when keyboard is visible
               ),
             decoration: BoxDecoration(
-                color: Theme.of(context).cardColor.withOpacity(0.85),
+                color: isDarkMode 
+                    ? const Color(0xFF2C2C2E)  // Match AI bubble color in dark mode
+                    : const Color(0xFFF5F5F7), // Match AI bubble color in light mode
               borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(4.0),
                 topRight: Radius.circular(20.0),
                   bottomLeft: Radius.circular(20.0),
                 bottomRight: Radius.circular(20.0),
               ),
+              border: Border.all(
+                color: isDarkMode 
+                    ? const Color(0xFF3C3C3C)  // Dark border for dark mode
+                    : const Color(0xFFE1E1E6), // Light border for light mode
+                width: 1.0
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                    blurRadius: 5,
-                  offset: const Offset(0, 2),
+                  color: isDarkMode 
+                      ? Colors.black.withOpacity(0.3)
+                      : Colors.black.withOpacity(0.15),
+                    blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+                BoxShadow(
+                  color: isDarkMode 
+                      ? Colors.black.withOpacity(0.2)
+                      : Colors.black.withOpacity(0.08),
+                    blurRadius: 6,
+                  offset: const Offset(0, 1),
                 ),
               ],
             ),
@@ -976,7 +998,7 @@ class ConversationsDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeService = Provider.of<ThemeService>(context);
     final colorScheme = Theme.of(context).colorScheme;
-    final dialogBackgroundColor = isDarkMode ? const Color(0xFF272741) : Colors.white;
+    final dialogBackgroundColor = isDarkMode ? const Color(0xFF1C1C1E) : Colors.white;
     final textColor = isDarkMode ? Colors.white : Colors.black87;
     final secondaryTextColor = isDarkMode ? Colors.white70 : Colors.black54;
     
@@ -1012,12 +1034,12 @@ class ConversationsDialog extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: Colors.white,
+                    backgroundColor: isDarkMode ? const Color(0xFF2C2C2E) : Colors.white,
                     backgroundImage: userModel.profileImagePath != null && userModel.profileImagePath!.isNotEmpty
                         ? FileImage(File(userModel.profileImagePath!))
                         : null,
                     child: (userModel.profileImagePath == null || userModel.profileImagePath!.isEmpty)
-                        ? const Icon(Icons.person, size: 24, color: Colors.pink)
+                        ? Icon(Icons.person, size: 24, color: themeService.primary)
                         : null,
                       ),
                       const SizedBox(width: 16),
@@ -1215,7 +1237,7 @@ class ConversationsDialog extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDarkMode ? const Color(0xFF1A1A2E) : const Color(0xFFF5F5F8),
+                color: isDarkMode ? const Color(0xFF2C2C2E) : const Color(0xFFF8F8F8),
                 borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(24),
                   bottomRight: Radius.circular(24),
@@ -1404,14 +1426,18 @@ class _AnimatedMessageState extends State<AnimatedMessage> with SingleTickerProv
   Widget _buildMessageBubble(ChatMessage message, ColorScheme colorScheme, bool isDarkMode, UserModel userModel) {
     final isUserMessage = message.sender == MessageSender.user;
     
-    // Use theme colors for bubbles
+    // Use completely solid colors with aesthetic colors for AI
     final bubbleColor = isUserMessage
-        ? colorScheme.primary.withOpacity(0.9) // User bubble uses primary color
-        : Theme.of(context).cardColor.withOpacity(0.85); // AI bubble uses card color
+        ? colorScheme.primary // User bubble uses primary color (solid)
+        : isDarkMode 
+            ? const Color(0xFF2C2C2E)  // Lighter gray for AI bubbles in dark mode
+            : const Color(0xFFF5F5F7); // Light soft grey for AI bubbles in light mode
     
     final textColor = isUserMessage
         ? Colors.white
-        : Theme.of(context).textTheme.bodyLarge?.color ?? (isDarkMode ? Colors.white : Colors.black87);
+        : isDarkMode
+            ? const Color(0xFFFFFFFF)  // White text for dark AI bubbles
+            : const Color(0xFF2C2C2E); // Dark text for light AI bubbles
     
     // Time stamp formatting
     final timestamp = message.timestamp;
@@ -1450,7 +1476,7 @@ class _AnimatedMessageState extends State<AnimatedMessage> with SingleTickerProv
               height: avatarSize,
               margin: const EdgeInsets.only(right: 8.0),
               decoration: BoxDecoration(
-                color: colorScheme.primary.withOpacity(0.3),
+                color: colorScheme.primary.withOpacity(0.15), // Elegant opacity with primary color
                 borderRadius: BorderRadius.circular(avatarSize / 2),
               ),
               child: Center(
@@ -1499,11 +1525,28 @@ class _AnimatedMessageState extends State<AnimatedMessage> with SingleTickerProv
                               bottomLeft: Radius.circular(20.0),
                               bottomRight: Radius.circular(20.0),
                             ),
+                      border: !isUserMessage
+                          ? Border.all(
+                              color: isDarkMode 
+                                  ? const Color(0xFF3C3C3C)  // Dark border for dark mode AI bubbles
+                                  : const Color(0xFFE1E1E6), // Light border for light mode AI bubbles
+                              width: 1.0
+                            ) 
+                          : null,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 5,
-                          offset: const Offset(0, 2),
+                          color: isDarkMode 
+                              ? Colors.black.withOpacity(0.3)
+                              : Colors.black.withOpacity(0.15),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                        BoxShadow(
+                          color: isDarkMode 
+                              ? Colors.black.withOpacity(0.2)
+                              : Colors.black.withOpacity(0.08),
+                          blurRadius: 6,
+                          offset: const Offset(0, 1),
                         ),
                       ],
                     ),
@@ -1516,13 +1559,125 @@ class _AnimatedMessageState extends State<AnimatedMessage> with SingleTickerProv
                               color: textColor,
                             ),
                           )
-                        : SelectableText(
-                            message.text,
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
-                            ),
-                          ),
+                        : isUserMessage
+                            ? SelectableText(
+                                message.text,
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
+                                ),
+                              )
+                            : MarkdownBody(
+                                data: message.text,
+                                selectable: true,
+                                builders: {
+                                  'code': SyntaxHighlightBuilder(isDarkMode: isDarkMode),
+                                },
+                                styleSheet: MarkdownStyleSheet(
+                                  p: TextStyle(
+                                    color: textColor,
+                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
+                                    height: 1.4,
+                                  ),
+                                  a: TextStyle(
+                                    color: textColor, // Link color
+                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
+                                  ),
+                                  tableHead: TextStyle(
+                                    color: textColor, // Table header color
+                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  tableBody: TextStyle(
+                                    color: textColor, // Table body color
+                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
+                                  ),
+                                  strong: TextStyle(
+                                    color: textColor,
+                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.4,
+                                  ),
+                                  em: TextStyle(
+                                    color: textColor,
+                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
+                                    fontStyle: FontStyle.italic,
+                                    height: 1.4,
+                                  ),
+                                  code: TextStyle(
+                                    color: isDarkMode 
+                                        ? const Color(0xFF9CDCFE)  // VS Code blue for variables
+                                        : const Color(0xFF0451A5), // VS Code dark blue
+                                    fontSize: widget.isKeyboardVisible ? 12.0 : 14.0,
+                                    fontFamily: 'monospace',
+                                    backgroundColor: isDarkMode 
+                                        ? const Color(0xFF1E1E1E)  // VS Code dark background
+                                        : const Color(0xFFF8F8F8), // VS Code light background
+                                  ),
+                                  codeblockDecoration: const BoxDecoration(
+                                    color: Colors.transparent, // Remove background to prevent double containers
+                                    borderRadius: BorderRadius.zero, // Remove border radius
+                                  ),
+                                  codeblockPadding: const EdgeInsets.all(12),
+                                  listBullet: TextStyle(
+                                    color: textColor,
+                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
+                                    height: 1.4,
+                                  ),
+                                  listIndent: 20,
+                                  h1: TextStyle(
+                                    color: textColor, // Use textColor instead of hardcoded dark color
+                                    fontSize: widget.isKeyboardVisible ? 18.0 : 20.0,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.3,
+                                  ),
+                                  h2: TextStyle(
+                                    color: textColor, // Use textColor instead of hardcoded dark color
+                                    fontSize: widget.isKeyboardVisible ? 16.0 : 18.0,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.3,
+                                  ),
+                                  h3: TextStyle(
+                                    color: textColor, // Use textColor instead of hardcoded dark color
+                                    fontSize: widget.isKeyboardVisible ? 15.0 : 17.0,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.3,
+                                  ),
+                                  h4: TextStyle(
+                                    color: textColor,
+                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.3,
+                                  ),
+                                  h5: TextStyle(
+                                    color: textColor,
+                                    fontSize: widget.isKeyboardVisible ? 13.0 : 15.0,
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.3,
+                                  ),
+                                  h6: TextStyle(
+                                    color: textColor,
+                                    fontSize: widget.isKeyboardVisible ? 12.0 : 14.0,
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.3,
+                                  ),
+                                  blockquote: TextStyle(
+                                    color: textColor.withOpacity(0.8),
+                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
+                                    fontStyle: FontStyle.italic,
+                                    height: 1.4,
+                                  ),
+                                  blockquoteDecoration: BoxDecoration(
+                                    border: Border(
+                                      left: BorderSide(
+                                        color: const Color(0xFFD1D1D6),
+                                        width: 3,
+                                      ),
+                                    ),
+                                  ),
+                                  blockquotePadding: const EdgeInsets.only(left: 12),
+                                ),
+                              ),
                   ),
                 ),
                 
@@ -1548,7 +1703,7 @@ class _AnimatedMessageState extends State<AnimatedMessage> with SingleTickerProv
               height: avatarSize,
               margin: const EdgeInsets.only(left: 8.0),
               decoration: BoxDecoration(
-                color: colorScheme.primary.withOpacity(0.3),
+                color: colorScheme.primary.withOpacity(0.15), // Elegant opacity with primary color
                 borderRadius: BorderRadius.circular(avatarSize / 2),
               ),
               child: userModel.profileImagePath != null && userModel.profileImagePath!.isNotEmpty
@@ -1628,7 +1783,9 @@ class _AnimatedDotState extends State<AnimatedDot> with SingleTickerProviderStat
               height: 8,
             margin: const EdgeInsets.symmetric(horizontal: 2),
               decoration: BoxDecoration(
-                color: isDarkMode ? Colors.white70 : Colors.black54,
+                color: isDarkMode 
+                    ? Colors.white  // White dots in dark mode for visibility
+                    : const Color(0xFFD1D1D6), // Gray dots in light mode
                 shape: BoxShape.circle,
             ),
           ),
@@ -1649,5 +1806,123 @@ class _KeyboardVisibilityObserver extends WidgetsBindingObserver {
     final bottomInset = View.of(_state.context).viewInsets.bottom;
     final isKeyboardVisible = bottomInset > 0.0;
     _state.updateKeyboardVisibility(isKeyboardVisible, bottomInset);
+  }
+}
+
+// Custom syntax highlight builder for code blocks with VS Code colors
+class SyntaxHighlightBuilder extends MarkdownElementBuilder {
+  final bool isDarkMode;
+  
+  SyntaxHighlightBuilder({required this.isDarkMode});
+  
+  @override
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    final String language = element.attributes['class']?.replaceFirst('language-', '') ?? 'text';
+    final String code = element.textContent;
+    
+    if (element.tag == 'code') {
+      // Check if it's likely a multi-line code block (longer text or contains newlines)
+      bool isCodeBlock = code.contains('\n') || code.length > 30;
+      
+      if (isCodeBlock) {
+        // Multi-line code block with syntax highlighting
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Stack(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDarkMode 
+                      ? const Color(0xFF1C1C1E)  // Darker background for dark mode
+                      : const Color(0xFFF8F8F8), // Light background for light mode
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isDarkMode 
+                        ? const Color(0xFF3C3C3C)  // Dark border for dark mode
+                        : const Color(0xFFE1E4E8), // Light border for light mode
+                    width: 1,
+                  ),
+                ),
+                child: HighlightView(
+                  code,
+                  language: _getLanguage(language),
+                  theme: isDarkMode ? vs2015Theme : vsTheme, // Use appropriate theme
+                  padding: EdgeInsets.zero,
+                  textStyle: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 14,
+                    color: isDarkMode ? Colors.white : Colors.black87, // Ensure text is visible
+                  ),
+                ),
+              ),
+              // Copy button
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: code));
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Icon(
+                      Icons.copy,
+                      size: 16,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      } else {
+        // Inline code with syntax highlighting
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          decoration: BoxDecoration(
+            color: isDarkMode 
+                ? const Color(0xFF1C1C1E)  // Darker background for dark mode
+                : const Color(0xFFF8F8F8), // Light background for light mode
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: HighlightView(
+            code,
+            language: _getLanguage(language),
+            theme: isDarkMode ? vs2015Theme : vsTheme, // Use appropriate theme
+            padding: EdgeInsets.zero,
+            textStyle: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 14,
+              color: isDarkMode ? Colors.white : Colors.black87, // Ensure text is visible
+            ),
+          ),
+        );
+      }
+    }
+    
+    return null;
+  }
+  
+  String _getLanguage(String lang) {
+    // Map common language names to highlight.js supported names
+    final languageMap = {
+      'js': 'javascript',
+      'ts': 'typescript',
+      'py': 'python',
+      'rb': 'ruby',
+      'sh': 'bash',
+      'yml': 'yaml',
+      'md': 'markdown',
+    };
+    
+    return languageMap[lang.toLowerCase()] ?? lang.toLowerCase();
   }
 }

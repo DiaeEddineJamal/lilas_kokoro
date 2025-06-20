@@ -534,9 +534,22 @@ class _DashboardTabState extends State<DashboardTab> {
     final recentConversations = _cachedConversations!.take(3).toList();
     
     return Column(
-      children: recentConversations.map((conversation) => 
-        _buildConversationCard(context, conversation)
-      ).toList(),
+      children: recentConversations
+          .asMap()
+          .entries
+          .map((entry) {
+            final index = entry.key;
+            final conversation = entry.value;
+            final isLast = index == recentConversations.length - 1;
+            
+            return Column(
+              children: [
+                _buildConversationCard(context, conversation),
+                if (!isLast) const SizedBox(height: 12), // Add spacing between cards
+              ],
+            );
+          })
+          .toList(),
     );
   }
 
