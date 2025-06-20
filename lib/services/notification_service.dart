@@ -98,93 +98,95 @@ class NotificationService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Initialize notification service
+  // Initialize notification service with crash prevention
   Future<void> initialize() async {
     if (kIsWeb) return;
     
-    debugPrint('🔔 Initializing NotificationService...');
-    
-    // Initialize timezone
-    tz_data.initializeTimeZones();
-    final String timeZoneName = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(timeZoneName));
-    debugPrint('🌍 Timezone set to: $timeZoneName');
-    
-    // Initialize notification plugin
-    const AndroidInitializationSettings androidInitializationSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    
-    final DarwinInitializationSettings iosInitializationSettings =
-        DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-      notificationCategories: [
-        // Add reminder category
-        DarwinNotificationCategory(
-          'reminder',
-          actions: [
-            DarwinNotificationAction.plain(
-              'mark_complete',
-              '✅ Complete',
-              options: {DarwinNotificationActionOption.foreground},
-            ),
-            DarwinNotificationAction.plain(
-              'snooze_reminder',
-              '⏰ Remind Later',
-              options: {DarwinNotificationActionOption.foreground},
-            ),
-          ],
-        ),
-      ],
-    );
-    
-    final InitializationSettings initializationSettings = InitializationSettings(
-      android: androidInitializationSettings,
-      iOS: iosInitializationSettings,
-    );
-    
-    final bool? initialized = await _flutterLocalNotificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: onNotificationResponse,
-    );
-    
-    debugPrint('🔔 Notification plugin initialized: $initialized');
-    
-    // Load preferences
-    await _loadPreferences();
-    
-    // Create notification channels for Android
-    final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
-        _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-            
-    if (androidPlugin != null) {
-      // Create reminder channel with high importance
-      final AndroidNotificationChannel reminderChannel = AndroidNotificationChannel(
-        'reminder_channel',
-        'Reminders',
-        description: 'Notifications for reminders',
-        importance: Importance.max, // Changed to max for better visibility
-        // Use preferences to configure channel defaults
-        enableVibration: _vibrationEnabled,
-        enableLights: true,
-        playSound: _soundEnabled,
-        showBadge: true,
+    try {
+      debugPrint('🔔 Initializing NotificationService...');
+      
+      // Initialize timezone with error handling
+      try {
+        tz_data.initializeTimeZones();
+        final String timeZoneName = await FlutterTimezone.getLocalTimezone();
+        tz.setLocalLocation(tz.getLocation(timeZoneName));
+        debugPrint('🌍 Timezone set to: $timeZoneName');
+      } catch (e) {
+        debugPrint('⚠️ Error setting timezone: $e - using default');
+      }
+      
+      // Load preferences first
+      await _loadPreferences();
+      
+      // Initialize notification plugin with minimal settings
+      const AndroidInitializationSettings androidInitializationSettings =
+          AndroidInitializationSettings('@mipmap/launcher_icon');
+      
+      const DarwinInitializationSettings iosInitializationSettings =
+          DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
       );
-      await androidPlugin.createNotificationChannel(reminderChannel);
-      debugPrint('🔔 Android notification channel created');
+      
+      const InitializationSettings initializationSettings = InitializationSettings(
+        android: androidInitializationSettings,
+        iOS: iosInitializationSettings,
+      );
+      
+      final bool? initialized = await _flutterLocalNotificationsPlugin.initialize(
+        initializationSettings,
+        onDidReceiveNotificationResponse: onNotificationResponse,
+      ).catchError((error) {
+        debugPrint('❌ Error initializing notification plugin: $error');
+        return false;
+      });
+      
+      debugPrint('🔔 Notification plugin initialized: $initialized');
+      
+      // Create notification channels for Android with error handling
+      try {
+        final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+            _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>();
+                
+        if (androidPlugin != null) {
+          // Create simple notification channel
+          const AndroidNotificationChannel reminderChannel = AndroidNotificationChannel(
+            'reminder_channel',
+            'Reminders',
+            description: 'Critical reminders',
+            importance: Importance.high,
+            enableVibration: true,
+            enableLights: true,
+            playSound: true,
+            showBadge: true,
+          );
+          await androidPlugin.createNotificationChannel(reminderChannel);
+          debugPrint('🔔 Android notification channel created');
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error creating notification channel: $e');
+      }
+      
+      // Request permissions with error handling
+      try {
+        final bool permissionGranted = await requestPermissions();
+        debugPrint('🔔 Notification permissions granted: $permissionGranted');
+        
+        if (!permissionGranted) {
+          debugPrint('⚠️ Notification permissions not granted - notifications may not work');
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error requesting permissions: $e');
+      }
+      
+      debugPrint('✅ NotificationService initialized successfully');
+      
+    } catch (e) {
+      debugPrint('❌ Critical error in NotificationService initialization: $e');
+      // Don't rethrow - allow app to continue without notifications
     }
-    
-    // Always request notification permissions during initialization
-    final bool permissionGranted = await requestPermissions();
-    debugPrint('🔔 Notification permissions granted: $permissionGranted');
-    
-    if (!permissionGranted) {
-      debugPrint('⚠️ Notification permissions not granted - notifications may not work');
-    }
-    
-    debugPrint('✅ NotificationService initialized successfully');
   }
   
   // Request notification permissions
@@ -206,6 +208,14 @@ class NotificationService extends ChangeNotifier {
         // Also check if notifications are enabled
         final bool? enabled = await androidPlugin.areNotificationsEnabled();
         debugPrint('🔔 Android notifications enabled: $enabled');
+        
+        // Request exact alarm permission for Android 12+
+        try {
+          final bool? exactAlarmPermission = await androidPlugin.requestExactAlarmsPermission();
+          debugPrint('🔔 Exact alarm permission granted: $exactAlarmPermission');
+        } catch (e) {
+          debugPrint('⚠️ Exact alarm permission not available or error: $e');
+        }
         
         return granted ?? false;
       } catch (e) {
@@ -236,22 +246,62 @@ class NotificationService extends ChangeNotifier {
     
     return false;
   }
+
+  // Request battery optimization exemption for better background notifications
+  Future<void> requestBatteryOptimizationExemption() async {
+    if (kIsWeb) return;
+    
+    try {
+      debugPrint('🔋 Requesting battery optimization exemption...');
+      
+      // For Android, we can guide the user to disable battery optimization
+      // The actual implementation would require platform-specific code
+      debugPrint('💡 User should disable battery optimization for the app in device settings');
+      debugPrint('📱 This helps ensure notifications work when the app is closed');
+      
+    } catch (e) {
+      debugPrint('❌ Error requesting battery optimization exemption: $e');
+    }
+  }
   
   // Handle notification response (including action buttons)
   void onNotificationResponse(NotificationResponse response) {
-    // Handle notification tap
-    if (response.payload != null) {
-      debugPrint('Notification payload: ${response.payload}');
+    try {
+      debugPrint('🔔 Notification response received: ${response.payload}');
       
-      // Handle reminder actions
-      if (response.actionId == 'mark_complete' && response.payload!.startsWith('reminder:')) {
-        final reminderId = response.payload!.split(':')[1];
-        _markReminderComplete(reminderId);
-      } 
-      else if (response.actionId == 'snooze_reminder' && response.payload!.startsWith('reminder:')) {
-        final reminderId = response.payload!.split(':')[1];
-        _snoozeReminder(reminderId);
+      // Handle notification tap
+      if (response.payload != null && response.payload!.isNotEmpty) {
+        debugPrint('📱 Processing notification payload: ${response.payload}');
+        
+        // Handle reminder actions with proper error handling
+        if (response.actionId == 'mark_complete' && response.payload!.startsWith('reminder:')) {
+          final parts = response.payload!.split(':');
+          if (parts.length >= 2) {
+            final reminderId = parts[1];
+            _markReminderComplete(reminderId).catchError((error) {
+              debugPrint('❌ Error marking reminder complete: $error');
+            });
+          }
+        } 
+        else if (response.actionId == 'snooze_reminder' && response.payload!.startsWith('reminder:')) {
+          final parts = response.payload!.split(':');
+          if (parts.length >= 2) {
+            final reminderId = parts[1];
+            _snoozeReminder(reminderId).catchError((error) {
+              debugPrint('❌ Error snoozing reminder: $error');
+            });
+          }
+        }
+        else {
+          // Handle regular notification tap (no action button)
+          debugPrint('📱 Regular notification tap - no specific action needed');
+        }
+      } else {
+        debugPrint('📱 Notification response with no payload');
       }
+    } catch (e) {
+      debugPrint('❌ Error handling notification response: $e');
+      // Don't rethrow - we don't want to crash the app
     }
   }
   
@@ -418,38 +468,63 @@ class NotificationService extends ChangeNotifier {
     bool vibrate = true,
     String customSoundPath = '',
   }) async {
-    // Define vibration pattern
-    final vibrationPattern = Int64List.fromList([0, 500]);
-  
-    // Process sound path for Android
-    String? processedSoundPath;
-    if (customSoundPath.isNotEmpty && customSoundPath != 'default') {
-      processedSoundPath = await _getSoundFilePath(customSoundPath);
-      debugPrint('🔊 Processed sound path for notification: $processedSoundPath');
-    }
-  
-    // Create a unique channel ID for the notification
-    final channelId = 'reminder_channel';
+    try {
+      // Define vibration pattern - use a simpler pattern to avoid crashes
+      final vibrationPattern = vibrate ? Int64List.fromList([0, 250, 250, 250]) : null;
     
-    return AndroidNotificationDetails(
-      channelId,
-      'Reminders',
-      channelDescription: 'Notifications for reminders',
-      importance: Importance.max,
-      priority: Priority.max,
-      sound: processedSoundPath != null && processedSoundPath != 'default_sound'
-          ? UriAndroidNotificationSound(processedSoundPath)
-          : null,
-      playSound: true,
-      enableVibration: vibrate,
-      vibrationPattern: vibrationPattern,
-      ongoing: ongoing,
-      autoCancel: autoCancel,
-      category: AndroidNotificationCategory.reminder,
-      visibility: NotificationVisibility.public,
-      channelAction: AndroidNotificationChannelAction.createIfNotExists,
-      audioAttributesUsage: AudioAttributesUsage.notification,
-    );
+      // Simplified sound handling to prevent crashes
+      AndroidNotificationSound? notificationSound;
+      if (_soundEnabled && customSoundPath.isNotEmpty && customSoundPath != 'default') {
+        try {
+          final processedSoundPath = await _getSoundFilePath(customSoundPath);
+          if (processedSoundPath != 'default_sound') {
+            notificationSound = UriAndroidNotificationSound(processedSoundPath);
+          }
+        } catch (e) {
+          debugPrint('⚠️ Error processing custom sound, using default: $e');
+          notificationSound = null; // Fall back to default system sound
+        }
+      }
+    
+      // Create notification details with safer configuration
+      return AndroidNotificationDetails(
+        'reminder_channel',
+        'Reminders',
+        channelDescription: 'Critical reminders that must be delivered',
+        importance: Importance.max,
+        priority: Priority.max,
+        sound: notificationSound,
+        playSound: _soundEnabled,
+        enableVibration: vibrate && _vibrationEnabled,
+        vibrationPattern: vibrationPattern,
+        ongoing: ongoing,
+        autoCancel: autoCancel,
+        category: AndroidNotificationCategory.reminder,
+        visibility: NotificationVisibility.public,
+        channelAction: AndroidNotificationChannelAction.createIfNotExists,
+        audioAttributesUsage: AudioAttributesUsage.notification,
+        // Remove potentially problematic properties that might cause crashes
+        enableLights: true,
+        ledColor: const Color(0xFFFF69B4),
+        ledOnMs: 1000,
+        ledOffMs: 500,
+      );
+    } catch (e) {
+      debugPrint('❌ Error creating Android notification details: $e');
+      // Return a minimal safe configuration if there's an error
+      return const AndroidNotificationDetails(
+        'reminder_channel',
+        'Reminders',
+        channelDescription: 'Critical reminders',
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
+        autoCancel: true,
+        category: AndroidNotificationCategory.reminder,
+        visibility: NotificationVisibility.public,
+      );
+    }
   }
 
   // Add this method to process sound files
@@ -599,178 +674,68 @@ class NotificationService extends ChangeNotifier {
     }
   }
 
-  // Schedule a notification for a reminder
+  // Schedule a notification for a reminder - simplified to prevent crashes
   Future<void> scheduleReminderNotification(Reminder reminder) async {
     if (!_notificationsEnabled || reminder.isCompleted) {
       debugPrint('⚠️ Skipping notification for ${reminder.title}: notificationsEnabled=$_notificationsEnabled, isCompleted=${reminder.isCompleted}');
       return;
     }
     
+    // Simple notification scheduling to prevent crashes
     try {
-      debugPrint('🔔 Starting to schedule notification for: ${reminder.title}');
+      debugPrint('🔔 Scheduling notification for: ${reminder.title}');
       
-      // Generate notification ID from reminder ID (ensure consistency)
+      // Generate simple notification ID
       final int notificationId = reminder.id.hashCode.abs() % 100000;
-      debugPrint('📱 Notification ID: $notificationId');
       
-      // Get reminder time as TZDateTime for correct timezone handling
-      final reminderTime = tz.TZDateTime.from(reminder.dateTime, tz.local);
-      final now = tz.TZDateTime.now(tz.local);
-      
-      debugPrint('📅 Reminder time: ${reminder.dateTime}');
-      debugPrint('📅 TZ Reminder time: $reminderTime');
-      debugPrint('📅 Current time: $now');
-      debugPrint('🔁 Is repeating: ${reminder.isRepeating}');
-      debugPrint('📅 Repeat days: ${reminder.repeatDays}');
-      
-      DateTime? scheduleTime;
-      
+      // Calculate schedule time
+      DateTime scheduleTime;
       if (reminder.isRepeating && reminder.repeatDays.isNotEmpty) {
-        // For repeating reminders, find the next occurrence
-        scheduleTime = _getNextReminderOccurrence(reminder);
-        if (scheduleTime == null) {
-          debugPrint('⚠️ No valid next occurrence found for repeating reminder: ${reminder.title}');
-          return;
-        }
-        debugPrint('🔄 Next occurrence for repeating reminder: $scheduleTime');
+        scheduleTime = _getNextReminderOccurrence(reminder) ?? reminder.dateTime;
       } else {
-        // For one-time reminders, use the exact scheduled time
-        if (reminderTime.isBefore(now)) {
-          debugPrint('⚠️ Cannot schedule notification for past time: ${reminder.dateTime}');
-          return;
-        }
         scheduleTime = reminder.dateTime;
-        debugPrint('📅 One-time reminder scheduled for: $scheduleTime');
       }
       
-      // Convert to TZDateTime for scheduling
-      final tzScheduleTime = tz.TZDateTime.from(scheduleTime, tz.local);
-      debugPrint('🌍 TZ Schedule time: $tzScheduleTime');
-      
-      // Verify the schedule time is in the future
-      if (tzScheduleTime.isBefore(now)) {
-        debugPrint('⚠️ Calculated schedule time is in the past: $tzScheduleTime vs $now');
+      // Skip if time is in the past
+      if (scheduleTime.isBefore(DateTime.now())) {
+        debugPrint('⚠️ Schedule time is in the past, skipping: $scheduleTime');
         return;
       }
       
-      // Check if notifications are actually enabled on the device
-      final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
-          _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
-      
-      if (androidPlugin != null) {
-        final bool? enabled = await androidPlugin.areNotificationsEnabled();
-        debugPrint('📱 Device notifications enabled: $enabled');
-        if (enabled == false) {
-          debugPrint('⚠️ Device notifications are disabled - notification may not appear');
-        }
-      }
-      
-      // Create personalized title and body for the notification
+      // Create simple notification title and body
       final String title = '${reminder.emoji} ${reminder.title}';
-      String body = '';
+      final String body = reminder.description.isNotEmpty 
+          ? reminder.description 
+          : 'Reminder scheduled for ${DateFormat('h:mm a').format(scheduleTime)}';
       
-      // Add description if available
-      if (reminder.description.isNotEmpty) {
-        body = reminder.description;
-      }
+      // Convert to timezone
+      final tzScheduleTime = tz.TZDateTime.from(scheduleTime, tz.local);
       
-      // Add scheduled time information
-      final timeFormat = DateFormat('h:mm a');
-      final dateFormat = DateFormat('MMM d, yyyy');
-      body += body.isNotEmpty ? '\n\n' : '';
-      body += '⏰ Scheduled for ${timeFormat.format(scheduleTime)}';
-      
-      // Add date if it's not today
-      final today = DateTime.now();
-      final isToday = scheduleTime.year == today.year && 
-                     scheduleTime.month == today.month && 
-                     scheduleTime.day == today.day;
-      
-      if (!isToday) {
-        body += ' on ${dateFormat.format(scheduleTime)}';
-      }
-      
-      // If it's a repeating reminder, add info about the recurrence
-      if (reminder.isRepeating && reminder.repeatDays.isNotEmpty) {
-        body += '\n🔁 Repeats: ${reminder.repeatDays.join(", ")}';
-      }
-      
-      // Add category if available
-      if (reminder.category.isNotEmpty && reminder.category != 'General') {
-        body += '\n📂 ${reminder.category}';
-      }
-      
-      debugPrint('📝 Notification title: $title');
-      debugPrint('📝 Notification body: $body');
-      
-      // Prepare Android-specific notification details
-      final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        'reminder_channel',
-        'Reminders',
-        channelDescription: 'Notifications for reminders',
-        importance: Importance.max,
-        priority: Priority.high,
-        enableLights: true,
-        color: const Color(0xFFFF85A2), // Will be updated by theme
-        ledColor: const Color(0xFFFF85A2), // Will be updated by theme
-        ledOnMs: 1000,
-        ledOffMs: 500,
-        enableVibration: _vibrationEnabled,
-        playSound: _soundEnabled,
-        category: AndroidNotificationCategory.reminder,
-        fullScreenIntent: true,
-        visibility: NotificationVisibility.public,
-        styleInformation: BigTextStyleInformation(body),
-        actions: [
-          const AndroidNotificationAction(
-            'mark_complete',
-            '✅ Complete',
-            showsUserInterface: true,
-          ),
-          const AndroidNotificationAction(
-            'snooze_reminder',
-            '⏰ Later',
-            showsUserInterface: true,
-          ),
-        ],
-      );
-      
-      // Configure iOS notification details
-      final DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: _soundEnabled,
-        categoryIdentifier: 'reminder',
-        threadIdentifier: 'reminder_${reminder.id}',
-        interruptionLevel: InterruptionLevel.timeSensitive,
-      );
-      
-      // Add a unique ID as payload for handling notification taps
-      final String payload = 'reminder:${reminder.id}';
-      
-      debugPrint('🚀 Attempting to schedule notification...');
-      
-      // Schedule the notification with proper details
+      // Schedule with minimal configuration to prevent crashes
       await _flutterLocalNotificationsPlugin.zonedSchedule(
         notificationId,
         title,
         body,
         tzScheduleTime,
-        NotificationDetails(android: androidDetails, iOS: iosDetails),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'reminder_channel',
+            'Reminders',
+            channelDescription: 'Reminder notifications',
+            importance: Importance.high,
+            priority: Priority.high,
+            autoCancel: false,
+          ),
+        ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        payload: payload,
-        // For repeating reminders, use weekly matching
-        matchDateTimeComponents: reminder.isRepeating && reminder.repeatDays.isNotEmpty 
-            ? DateTimeComponents.dayOfWeekAndTime 
-            : null,
+        payload: 'reminder:${reminder.id}',
       );
       
-      debugPrint('✅ Notification scheduled successfully for ${reminder.title} at ${DateFormat('yyyy-MM-dd – kk:mm').format(scheduleTime)}');
+      debugPrint('✅ Notification scheduled successfully for ${reminder.title} at $scheduleTime');
       
     } catch (e) {
       debugPrint('❌ Error scheduling notification for ${reminder.title}: $e');
-      debugPrint('Stack trace: ${StackTrace.current}');
+      // Don't rethrow - allow app to continue
     }
   }
   
@@ -921,106 +886,63 @@ class NotificationService extends ChangeNotifier {
     }
   }
 
-  // Comprehensive notification system diagnostic
+  // Simple and safe notification test
   Future<void> runNotificationDiagnostic() async {
     if (kIsWeb) {
       debugPrint('🌐 Running on web - notifications not supported');
       return;
     }
     
-    debugPrint('🔍 === NOTIFICATION DIAGNOSTIC START ===');
+    debugPrint('🔍 === SIMPLE NOTIFICATION TEST START ===');
     
     try {
-      // 1. Check if notifications are enabled in service
-      debugPrint('1️⃣ Service notification settings:');
-      debugPrint('   - Notifications enabled: $_notificationsEnabled');
-      debugPrint('   - Sound enabled: $_soundEnabled');
-      debugPrint('   - Vibration enabled: $_vibrationEnabled');
+      // Test 1: Simple immediate notification
+      debugPrint('📱 Testing immediate notification...');
+      await _flutterLocalNotificationsPlugin.show(
+        12345,
+        'Test Notification',
+        'This is a test notification from Lilas Kokoro!',
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'reminder_channel',
+            'Reminders',
+            channelDescription: 'Test notifications',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+        ),
+      );
+      debugPrint('✅ Immediate notification sent');
       
-      // 2. Check Android permissions
-      final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
-          _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
+      // Test 2: Simple scheduled notification (5 seconds)
+      debugPrint('⏰ Testing scheduled notification (5 seconds)...');
+      final testTime = DateTime.now().add(const Duration(seconds: 5));
+      final tzTestTime = tz.TZDateTime.from(testTime, tz.local);
       
-      if (androidPlugin != null) {
-        debugPrint('2️⃣ Android notification status:');
-        try {
-          final bool? enabled = await androidPlugin.areNotificationsEnabled();
-          debugPrint('   - Device notifications enabled: $enabled');
-          
-          final bool? permissionGranted = await androidPlugin.requestNotificationsPermission();
-          debugPrint('   - Permission request result: $permissionGranted');
-        } catch (e) {
-          debugPrint('   - Error checking Android status: $e');
-        }
-      }
+      await _flutterLocalNotificationsPlugin.zonedSchedule(
+        12346,
+        'Scheduled Test',
+        'This scheduled notification shows background notifications work!',
+        tzTestTime,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'reminder_channel',
+            'Reminders',
+            channelDescription: 'Test scheduled notifications',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+      debugPrint('✅ Scheduled notification set for: $testTime');
       
-      // 3. Check iOS permissions
-      final IOSFlutterLocalNotificationsPlugin? iosPlugin =
-          _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin>();
-      
-      if (iosPlugin != null) {
-        debugPrint('3️⃣ iOS notification status:');
-        try {
-          final bool? result = await iosPlugin.requestPermissions(
-            alert: true,
-            badge: true,
-            sound: true,
-          );
-          debugPrint('   - Permission request result: $result');
-        } catch (e) {
-          debugPrint('   - Error checking iOS status: $e');
-        }
-      }
-      
-      // 4. Test timezone setup
-      debugPrint('4️⃣ Timezone information:');
-      try {
-        final String timeZoneName = await FlutterTimezone.getLocalTimezone();
-        final tz.Location location = tz.getLocation(timeZoneName);
-        final tz.TZDateTime now = tz.TZDateTime.now(location);
-        debugPrint('   - Timezone: $timeZoneName');
-        debugPrint('   - Current TZ time: $now');
-      } catch (e) {
-        debugPrint('   - Error with timezone: $e');
-      }
-      
-      // 5. Test immediate notification
-      debugPrint('5️⃣ Testing immediate notification...');
-      try {
-        await showNotification(
-          title: '🔍 Diagnostic Test',
-          body: 'If you see this, immediate notifications work!',
-          id: 99997,
-          payload: 'diagnostic:immediate',
-        );
-        debugPrint('   - Immediate notification sent successfully');
-      } catch (e) {
-        debugPrint('   - Error sending immediate notification: $e');
-      }
-      
-      // 6. Test scheduled notification (10 seconds)
-      debugPrint('6️⃣ Testing scheduled notification (10 seconds)...');
-      try {
-        final testTime = DateTime.now().add(const Duration(seconds: 10));
-        await scheduleNotification(
-          title: '⏰ Diagnostic Scheduled Test',
-          body: 'If you see this, scheduled notifications work!',
-          id: 99996,
-          scheduledTime: testTime,
-          payload: 'diagnostic:scheduled',
-        );
-        debugPrint('   - Scheduled notification set for: $testTime');
-      } catch (e) {
-        debugPrint('   - Error scheduling notification: $e');
-      }
-      
-      debugPrint('🔍 === NOTIFICATION DIAGNOSTIC COMPLETE ===');
-      debugPrint('📱 Check your notification panel for test notifications!');
+      debugPrint('🔍 === NOTIFICATION TEST COMPLETE ===');
+      debugPrint('📱 You should see an immediate notification now and another in 5 seconds!');
       
     } catch (e) {
-      debugPrint('❌ Diagnostic failed with error: $e');
+      debugPrint('❌ Notification test failed: $e');
+      rethrow; // Let the UI handle the error
     }
   }
 }

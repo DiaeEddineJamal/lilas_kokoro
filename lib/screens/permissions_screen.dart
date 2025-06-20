@@ -124,6 +124,66 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
     }
   }
 
+  Future<void> _testNotifications() async {
+    try {
+      final notificationService = Provider.of<NotificationService>(context, listen: false);
+      
+      // Run comprehensive notification diagnostic
+      await notificationService.runNotificationDiagnostic();
+      
+      // Show success dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green),
+                const SizedBox(width: 8),
+                Text("Test Sent!"),
+              ],
+            ),
+            content: Text(
+              "Test notifications have been sent:\n"
+              "• Immediate notification (should appear now)\n"
+              "• Scheduled notification (in 10 seconds)\n\n"
+              "If you don't see them, check your notification settings or try closing the app completely and wait for the scheduled one.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text("OK"),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      // Show error dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.error, color: Colors.red),
+                const SizedBox(width: 8),
+                Text("Test Failed"),
+              ],
+            ),
+            content: Text("Failed to send test notifications: $e"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text("OK"),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _continueToHome() async {
     // Still perform the local check before proceeding
     if (!_allPermissionsProcessed) {
@@ -321,6 +381,45 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                         textColor,
                         secondaryTextColor,
                         primaryColor,
+                      ),
+                    
+                    // Test Notification Button (only show if notifications are granted)
+                    if (_notificationsGranted)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: Container(
+                          width: double.infinity,
+                          height: 50,
+                          child: Material(
+                            color: primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(16),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: _testNotifications,
+                              child: Center(
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.notification_add_outlined,
+                                      color: primaryColor,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      "Test Notifications",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: primaryColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     
                     const Spacer(),
