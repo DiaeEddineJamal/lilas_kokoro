@@ -7,7 +7,7 @@ import '../models/user_model.dart';
 import '../services/data_service.dart';
 import '../services/notification_service.dart';
 import '../services/theme_service.dart';
-import '../widgets/app_header.dart';
+import '../widgets/gradient_app_bar.dart';
 
 class ReminderEditorScreen extends StatefulWidget {
   final Reminder? existingReminder;
@@ -181,10 +181,10 @@ class _ReminderEditorScreenState extends State<ReminderEditorScreen> {
   Widget build(BuildContext context) {
     final themeService = Provider.of<ThemeService>(context);
     final isDarkMode = themeService.isDarkMode;
-    final primaryColor = const Color(0xFFFF85A2);
-    final backgroundColor = isDarkMode ? const Color(0xFF2D2D3A) : Colors.white;
-    final cardColor = isDarkMode ? const Color(0xFF3E3E4E) : Colors.white;
-    final textColor = isDarkMode ? Colors.white : Colors.black87;
+    final theme = Theme.of(context);
+    final primaryColor = themeService.primary;
+    final backgroundColor = theme.scaffoldBackgroundColor;
+
 
     return WillPopScope(
       onWillPop: () async {
@@ -196,459 +196,273 @@ class _ReminderEditorScreenState extends State<ReminderEditorScreen> {
         return true; // Allow the system to handle the back button
       },
       child: Scaffold(
-      backgroundColor: backgroundColor,
-        appBar: AppHeader(
-          title: widget.existingReminder == null ? 'Create Reminder' : 'Edit Reminder',
-          titleIcon: Icons.edit_note,
-          showBackButton: true,
-          onBackPressed: () {
-            // Safely navigate back
-            if (Navigator.canPop(context)) {
-              Navigator.of(context).pop();
-            }
-          },
-      ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Title and Description
-              Card(
-                elevation: 2,
-                color: cardColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Reminder Details',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: textColor,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _titleController,
-                        style: TextStyle(color: textColor),
-                        decoration: InputDecoration(
-                          labelText: 'Title',
-                          labelStyle: TextStyle(color: textColor.withOpacity(0.7)),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: primaryColor,
-                              width: 2,
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: textColor.withOpacity(0.3),
-                            ),
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter a title';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _descriptionController,
-                        style: TextStyle(color: textColor),
-                        decoration: InputDecoration(
-                          labelText: 'Description',
-                          labelStyle: TextStyle(color: textColor.withOpacity(0.7)),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: primaryColor,
-                              width: 2,
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: textColor.withOpacity(0.3),
-                            ),
-                          ),
-                        ),
-                        maxLines: 3,
-                      ),
-                    ],
+        backgroundColor: backgroundColor,
+        appBar: GradientAppBar(
+          title: widget.existingReminder == null ? '➕ Add Reminder' : '✏️ Edit Reminder',
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+          automaticallyImplyLeading: false,
+        ),
+        body: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title and Description
+                Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Date and Time
-              Card(
-                elevation: 2,
-                color: cardColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Date & Time',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: textColor,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Material(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: () => _selectDate(context),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: textColor.withOpacity(0.3)),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.calendar_today,
-                                        color: primaryColor,
-                                        size: 18,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: Text(
-                                          DateFormat('MMM d, yyyy').format(_selectedDate),
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: textColor,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Material(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: () => _selectTime(context),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: textColor.withOpacity(0.3)),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.access_time,
-                                        color: primaryColor,
-                                        size: 18,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: Text(
-                                          _selectedTime.format(context),
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: textColor,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Emoji selector card
-              Card(
-                elevation: 2,
-                color: cardColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Choose Emoji',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: textColor,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: Wrap(
-                          alignment: WrapAlignment.spaceEvenly,
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: _emojis.map((emoji) {
-                            return Material(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: () {
-                                  setState(() {
-                                    _selectedEmoji = emoji;
-                                  });
-                                },
-                                child: Container(
-                                  width: 50,
-                                  height: 50,
-                                  decoration: BoxDecoration(
-                                    color: _selectedEmoji == emoji
-                                        ? const Color(0xFFFF85A2).withOpacity(0.2)
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: _selectedEmoji == emoji
-                                          ? const Color(0xFFFF85A2)
-                                          : Colors.grey.shade300,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      emoji,
-                                      style: const TextStyle(fontSize: 24),
-                                    ),
-                                  ),
-                                ),
-                              ));
-                          }).toList(),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Category selector
-              Card(
-                elevation: 2,
-                color: cardColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Category',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: textColor,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Center(
-                        child: Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: _categories.map((category) {
-                            final isSelected = _selectedCategory == category;
-                            return Material(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(20),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(20),
-                                onTap: () {
-                                  setState(() {
-                                    _selectedCategory = category;
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? const Color(0xFFFF85A2)
-                                        : const Color(0xFFFF85A2).withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    category,
-                                    style: TextStyle(
-                                      color: isSelected ? Colors.white : const Color(0xFFFF85A2),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Repeat options
-              Card(
-                elevation: 2,
-                color: cardColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Repeat',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: textColor,
-                            ),
-                          ),
-                          const Spacer(),
-                          Switch(
-                            value: _isRepeating,
-                            activeColor: primaryColor,
-                            onChanged: (value) {
-                              setState(() {
-                                _isRepeating = value;
-                                if (!value) {
-                                  _selectedDays.clear();
-                                }
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                      if (_isRepeating) ...[
-                        const SizedBox(height: 16),
+                  color: isDarkMode ? const Color(0xFF383844) : Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          'Repeat Days',
+                          'Reminder Details',
                           style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: textColor,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDarkMode ? Colors.white : Colors.black87,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        Center(
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _titleController,
+                          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87),
+                          decoration: InputDecoration(
+                            labelText: 'Title',
+                            labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Colors.grey.shade700),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: primaryColor,
+                                width: 2,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
+                              ),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter a title';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _descriptionController,
+                          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87),
+                          decoration: InputDecoration(
+                            labelText: 'Description',
+                            labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Colors.grey.shade700),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: primaryColor,
+                                width: 2,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
+                              ),
+                            ),
+                          ),
+                          maxLines: 3,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Date and Time
+                Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  color: isDarkMode ? const Color(0xFF383844) : Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Date & Time',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDarkMode ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Material(
+                                color: Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(12),
+                                  onTap: () => _selectDate(context),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.calendar_today,
+                                          color: primaryColor,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Flexible(
+                                          child: Text(
+                                            DateFormat('MMM d, yyyy').format(_selectedDate),
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: isDarkMode ? Colors.white : Colors.black87,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Material(
+                                color: Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(12),
+                                  onTap: () => _selectTime(context),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.access_time,
+                                          color: primaryColor,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Flexible(
+                                          child: Text(
+                                            _selectedTime.format(context),
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: isDarkMode ? Colors.white : Colors.black87,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Emoji selector card
+                Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  color: isDarkMode ? const Color(0xFF383844) : Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Choose Emoji',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDarkMode ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
                           child: Wrap(
-                            alignment: WrapAlignment.center,
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: [
-                              'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
-                            ].asMap().entries.map((entry) {
-                              final day = entry.value;
-                              final isSelected = _selectedDays.contains(day);
-                              
+                            alignment: WrapAlignment.spaceEvenly,
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: _emojis.map((emoji) {
                               return Material(
                                 color: Colors.transparent,
-                                shape: const CircleBorder(),
+                                borderRadius: BorderRadius.circular(12),
                                 child: InkWell(
-                                  customBorder: const CircleBorder(),
+                                  borderRadius: BorderRadius.circular(12),
                                   onTap: () {
                                     setState(() {
-                                      if (isSelected) {
-                                        _selectedDays.remove(day);
-                                      } else {
-                                        _selectedDays.add(day);
-                                      }
+                                      _selectedEmoji = emoji;
                                     });
                                   },
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    width: 40,
-                                    height: 40,
+                                  child: Container(
+                                    width: 50,
+                                    height: 50,
                                     decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? const Color(0xFFFF85A2)
+                                      color: _selectedEmoji == emoji
+                                          ? primaryColor.withOpacity(0.2)
                                           : Colors.transparent,
-                                      shape: BoxShape.circle,
+                                      borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
-                                        color: isSelected
-                                            ? const Color(0xFFFF85A2)
+                                        color: _selectedEmoji == emoji
+                                            ? primaryColor
                                             : Colors.grey.shade300,
                                         width: 2,
                                       ),
-                                      boxShadow: isSelected
-                                          ? [
-                                              BoxShadow(
-                                                color: const Color(0xFFFF85A2).withOpacity(0.3),
-                                                blurRadius: 4,
-                                                spreadRadius: 1,
-                                              )
-                                            ]
-                                          : null,
                                     ),
                                     child: Center(
                                       child: Text(
-                                        day.substring(0, 1),
-                                        style: TextStyle(
-                                          color: isSelected ? Colors.white : Colors.black87,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
-                                        ),
+                                        emoji,
+                                        style: const TextStyle(fontSize: 24),
                                       ),
                                     ),
                                   ),
@@ -658,41 +472,230 @@ class _ReminderEditorScreenState extends State<ReminderEditorScreen> {
                           ),
                         ),
                       ],
-                    ],
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Save button
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: Material(
-                  color: const Color(0xFFFF85A2),
-                  borderRadius: BorderRadius.circular(16),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: _isSaving ? null : _saveReminder,
-                    child: Center(
-                      child: _isSaving
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : Text(
-                              'Save Reminder',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
                     ),
                   ),
                 ),
+                
+                const SizedBox(height: 16),
+                
+                // Category selector
+                Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  color: isDarkMode ? const Color(0xFF383844) : Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Category',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isDarkMode ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Center(
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _categories.map((category) {
+                              final isSelected = _selectedCategory == category;
+                              return Material(
+                                color: Colors.transparent,
+                                borderRadius: BorderRadius.circular(20),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedCategory = category;
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? primaryColor
+                                          : primaryColor.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      category,
+                                      style: TextStyle(
+                                        color: isSelected ? Colors.white : primaryColor,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Repeat options
+                Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  color: isDarkMode ? const Color(0xFF383844) : Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Repeat',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: isDarkMode ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                            const Spacer(),
+                            Switch(
+                              value: _isRepeating,
+                              activeColor: primaryColor,
+                              onChanged: (value) {
+                                setState(() {
+                                  _isRepeating = value;
+                                  if (!value) {
+                                    _selectedDays.clear();
+                                  }
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                        if (_isRepeating) ...[
+                          const SizedBox(height: 16),
+                          Text(
+                            'Repeat Days',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: isDarkMode ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Center(
+                            child: Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: [
+                                'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
+                              ].asMap().entries.map((entry) {
+                                final day = entry.value;
+                                final isSelected = _selectedDays.contains(day);
+                                
+                                return Material(
+                                  color: Colors.transparent,
+                                  shape: const CircleBorder(),
+                                  child: InkWell(
+                                    customBorder: const CircleBorder(),
+                                    onTap: () {
+                                      setState(() {
+                                        if (isSelected) {
+                                          _selectedDays.remove(day);
+                                        } else {
+                                          _selectedDays.add(day);
+                                        }
+                                      });
+                                    },
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 200),
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? primaryColor
+                                            : Colors.transparent,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? primaryColor
+                                              : Colors.grey.shade300,
+                                          width: 2,
+                                        ),
+                                        boxShadow: isSelected
+                                            ? [
+                                                BoxShadow(
+                                                  color: primaryColor.withOpacity(0.3),
+                                                  blurRadius: 4,
+                                                  spreadRadius: 1,
+                                                )
+                                              ]
+                                            : null,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          day.substring(0, 1),
+                                          style: TextStyle(
+                                            color: isSelected ? Colors.white : Colors.black87,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Save button
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: Material(
+                    color: primaryColor,
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: _isSaving ? null : _saveReminder,
+                      child: Center(
+                        child: _isSaving
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : Text(
+                                'Save Reminder',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               ),
-              const SizedBox(height: 16),
-            ],
-            ),
           ),
         ),
       ),

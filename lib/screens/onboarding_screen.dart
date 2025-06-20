@@ -7,6 +7,8 @@ import '../services/theme_service.dart';
 import '../models/user_model.dart';
 import '../services/data_service.dart';
 import '../services/navigation_state_service.dart';
+import 'theme_selection_screen.dart';
+import 'permissions_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -71,44 +73,62 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  Future<void> _completeOnboarding() async {
+  Future<void> _goToThemeSelection() async {
     final userName = _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'User';
     final userId = DateTime.now().millisecondsSinceEpoch.toString();
     final now = DateTime.now();
     
     try {
       final dataService = Provider.of<DataService>(context, listen: false);
-      final userModel = Provider.of<UserModel>(context, listen: false);
-      final navigationStateService = Provider.of<NavigationStateService>(context, listen: false);
       
-      final updatedUser = userModel.copyWith(
+      // Save user data but don't mark onboarding as completed yet
+      final newUser = UserModel(
         id: userId,
         name: userName,
-        email: '$userName@example.com', // Consider a placeholder or removing email if not used
+        email: '$userName@example.com',
+        photoUrl: '',
+        profileImagePath: '',
         createdAt: now,
         lastLogin: now,
-        onboardingCompleted: true,
+        onboardingCompleted: false, // Keep false until after theme selection and permissions
+        isDarkMode: false,
+        notificationsEnabled: true,
+        colorSeed: 0,
+        theme: 'default',
+        themeColor: 'pink',
       );
       
-      await dataService.saveUser(updatedUser);
-      
-      await navigationStateService.completeOnboarding();
+      await dataService.saveUser(newUser);
       
       if (mounted) {
-        context.go('/');
+        // Navigate to theme selection screen
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ThemeSelectionScreen(
+              onContinue: () {
+                // After theme selection, go to permissions
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => const PermissionsScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Error'),
-          content: Text('Failed to complete onboarding: $e'),
-          actions: [
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Error'),
+            content: Text('Failed to save user data: $e'),
+            actions: [
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
-          ],
-        ),
-      );
+            ],
+          ),
+        );
       }
     }
   }
@@ -243,7 +263,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final bool isLastPage = _currentPage == _onboardingData.length - 1;
     final String buttonText = isLastPage ? 'Get Started' : 'Next';
     final VoidCallback? action = isLastPage 
-        ? _completeOnboarding 
+        ? _goToThemeSelection 
         : () {
             _pageController.nextPage(
               duration: const Duration(milliseconds: 500),
@@ -388,7 +408,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                  ),
                  textInputAction: TextInputAction.done,
-                 onSubmitted: (_) => _completeOnboarding(),
+                                   onSubmitted: (_) => _goToThemeSelection(),
                ),
              ),
              const SizedBox(height: 20), // Space after input field before button area

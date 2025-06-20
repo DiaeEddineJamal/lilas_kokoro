@@ -32,7 +32,15 @@ class DataService extends ChangeNotifier {
   // Initialization flag
   bool _isInitialized = false;
   
+  // Callback to notify UserModel provider when user data changes
+  Function(UserModel)? _userUpdateCallback;
+  
   DataService._internal();
+  
+  // Set callback for UserModel updates
+  void setUserUpdateCallback(Function(UserModel) callback) {
+    _userUpdateCallback = callback;
+  }
   
   // Initialize the service
   Future<void> initialize() async {
@@ -47,83 +55,98 @@ class DataService extends ChangeNotifier {
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
     
-    // Load user data
+    // Check if we should ignore existing data due to fresh install detection
+    final bool isFreshInstall = prefs.getBool('app_installed') == null || prefs.getBool('app_installed') == false;
+    
+    // Load user data - DON'T create default user if none exists
+    // Let the onboarding flow handle user creation
     final userJson = prefs.getString(_userKey);
-    if (userJson != null) {
-      _currentUser = UserModel.fromMap(json.decode(userJson));
+    if (userJson != null && !isFreshInstall) {
+      try {
+        _currentUser = UserModel.fromMap(json.decode(userJson));
+        debugPrint('📱 DataService: Loaded existing user: ${_currentUser?.name}');
+      } catch (e) {
+        debugPrint('❌ Error loading user data: $e');
+        _currentUser = null;
+      }
     } else {
-      // Create default user if none exists
-      _currentUser = UserModel(
-        id: const Uuid().v4(),
-        name: 'Guest',
-        email: '',
-        isDarkMode: false,
-        notificationsEnabled: true,
-        createdAt: DateTime.now(),
-        lastLogin: DateTime.now(),
-      );
-      await saveUser(_currentUser!);
+      if (isFreshInstall && userJson != null) {
+        debugPrint('📱 DataService: Fresh install detected - ignoring existing user data');
+      } else {
+        debugPrint('📱 DataService: No existing user data found - onboarding required');
+      }
+      _currentUser = null;
     }
     
-    // Load reminders
-    final remindersJson = prefs.getString(_remindersKey);
-    if (remindersJson != null) {
-      final List<dynamic> remindersList = json.decode(remindersJson);
-      _reminders = remindersList.map((e) => Reminder.fromMap(e)).toList();
-    } else {
-      // Create default reminders
-      _reminders = DefaultReminders.createDefaultReminders(_currentUser!.id);
-      await saveReminders(_reminders!);
-    }
-    
-    // Load conversations
-    final conversationsJson = prefs.getString(_conversationsKey);
-    if (conversationsJson != null) {
-      final List<dynamic> conversationsList = json.decode(conversationsJson);
-      _conversations = conversationsList.map((e) => ChatConversation.fromMap(e)).toList();
-    } else {
-      // Create default empty conversations list
-      _conversations = [];
-      await saveConversations(_conversations!);
-    }
-    
-    // Load love counter
-    final loveCounterJson = prefs.getString(_loveCounterKey);
-    if (loveCounterJson != null) {
-      _loveCounter = LoveCounter.fromMap(json.decode(loveCounterJson));
-    } else {
-      // Create default love counter
-      _loveCounter = LoveCounter(
-        id: const Uuid().v4(),
-        userId: _currentUser!.id,
-        userName: 'You',
-        partnerName: 'Partner',
-        anniversaryDate: DateTime.now(),
-        emoji: '❤️',
-        milestones: [],
-      );
-      await saveLoveCounter(_loveCounter!);
-    }
-    
-    // Load sounds
-    final soundsJson = prefs.getString(_soundsKey);
-    if (soundsJson != null) {
-      final List<dynamic> soundsList = json.decode(soundsJson);
-      _sounds = soundsList.map((e) => Sound.fromMap(e)).toList();
-    } else {
-      // Create default sounds
-      _sounds = [
-        Sound(
-          id: 'default_notification',
-          name: 'Default Notification',
-          storageUrl: 'assets/sounds/default_notification.mp3',
+    // Only load other data if user exists (after onboarding)
+    if (_currentUser != null) {
+      // Load reminders
+      final remindersJson = prefs.getString(_remindersKey);
+      if (remindersJson != null) {
+        final List<dynamic> remindersList = json.decode(remindersJson);
+        _reminders = remindersList.map((e) => Reminder.fromMap(e)).toList();
+      } else {
+        // Create default reminders for existing user
+        _reminders = DefaultReminders.createDefaultReminders(_currentUser!.id);
+        await saveReminders(_reminders!);
+      }
+      
+      // Load conversations
+      final conversationsJson = prefs.getString(_conversationsKey);
+      if (conversationsJson != null) {
+        final List<dynamic> conversationsList = json.decode(conversationsJson);
+        _conversations = conversationsList.map((e) => ChatConversation.fromMap(e)).toList();
+      } else {
+        // Create default empty conversations list
+        _conversations = [];
+        await saveConversations(_conversations!);
+      }
+      
+      // Load love counter
+      final loveCounterJson = prefs.getString(_loveCounterKey);
+      if (loveCounterJson != null) {
+        _loveCounter = LoveCounter.fromMap(json.decode(loveCounterJson));
+      } else {
+        // Create default love counter for existing user
+        _loveCounter = LoveCounter(
+          id: const Uuid().v4(),
           userId: _currentUser!.id,
-          type: SoundType.notification,
-          isAsset: true,
-          isDefault: true,
-        )
-      ];
-      await saveSounds(_sounds!);
+          userName: 'You',
+          partnerName: 'Partner',
+          anniversaryDate: DateTime.now(),
+          emoji: '❤️',
+          milestones: [],
+        );
+        await saveLoveCounter(_loveCounter!);
+      }
+      
+      // Load sounds
+      final soundsJson = prefs.getString(_soundsKey);
+      if (soundsJson != null) {
+        final List<dynamic> soundsList = json.decode(soundsJson);
+        _sounds = soundsList.map((e) => Sound.fromMap(e)).toList();
+      } else {
+        // Create default sounds for existing user
+        _sounds = [
+          Sound(
+            id: 'default_notification',
+            name: 'Default Notification',
+            storageUrl: 'assets/sounds/default_notification.mp3',
+            userId: _currentUser!.id,
+            type: SoundType.notification,
+            isAsset: true,
+            isDefault: true,
+          )
+        ];
+        await saveSounds(_sounds!);
+      }
+    } else {
+      // No user exists - initialize empty data
+      _reminders = [];
+      _conversations = [];
+      _loveCounter = null;
+      _sounds = [];
+      debugPrint('📱 DataService: Initialized with empty data - awaiting onboarding');
     }
   }
   
@@ -134,12 +157,70 @@ class DataService extends ChangeNotifier {
     return _currentUser;
   }
   
+  // Check if user exists (useful for onboarding flow)
+  bool hasUser() {
+    return _currentUser != null;
+  }
+  
   // Save user
   Future<void> saveUser(UserModel user) async {
+    final bool isFirstTimeUser = _currentUser == null;
     _currentUser = user;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_userKey, json.encode(user.toMap()));
+    
+    // If this is the first time saving a user, initialize default data
+    if (isFirstTimeUser) {
+      await _initializeDefaultDataForUser(user);
+    }
+    
     notifyListeners();
+    
+    // Notify UserModel provider of the update
+    if (_userUpdateCallback != null) {
+      _userUpdateCallback!(user);
+    }
+  }
+  
+  // Initialize default data for a new user (called after onboarding)
+  Future<void> _initializeDefaultDataForUser(UserModel user) async {
+    debugPrint('📱 DataService: Initializing default data for new user: ${user.name}');
+    
+    // Create default reminders
+    _reminders = DefaultReminders.createDefaultReminders(user.id);
+    await saveReminders(_reminders!);
+    
+    // Create empty conversations list
+    _conversations = [];
+    await saveConversations(_conversations!);
+    
+    // Create default love counter
+    _loveCounter = LoveCounter(
+      id: const Uuid().v4(),
+      userId: user.id,
+      userName: 'You',
+      partnerName: 'Partner',
+      anniversaryDate: DateTime.now(),
+      emoji: '❤️',
+      milestones: [],
+    );
+    await saveLoveCounter(_loveCounter!);
+    
+    // Create default sounds
+    _sounds = [
+      Sound(
+        id: 'default_notification',
+        name: 'Default Notification',
+        storageUrl: 'assets/sounds/default_notification.mp3',
+        userId: user.id,
+        type: SoundType.notification,
+        isAsset: true,
+        isDefault: true,
+      )
+    ];
+    await saveSounds(_sounds!);
+    
+    debugPrint('✅ DataService: Default data initialized for user: ${user.name}');
   }
   
   // Update user

@@ -146,9 +146,10 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
     });
     
     try {
-      // Update navigation state service
+      // Update navigation state service and complete onboarding
       final navigationStateService = Provider.of<NavigationStateService>(context, listen: false);
       await navigationStateService.grantPermissions();
+      await navigationStateService.completeOnboarding();
       
       // Use go_router to navigate (it will automatically redirect based on state)
       // context.go('/') will trigger the redirect logic which should now allow access to '/'
@@ -182,7 +183,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
     
     // Define colors based on theme
     final backgroundColor = isDarkMode ? const Color(0xFF1A1A2E) : const Color(0xFFFFF5F8);
-    final primaryColor = const Color(0xFFFF85A2);
+    final primaryColor = themeService.primary;
     final cardColor = isDarkMode ? const Color(0xFF272741) : Colors.white;
     final textColor = isDarkMode ? Colors.white : Colors.black87;
     final secondaryTextColor = isDarkMode ? Colors.white70 : Colors.black54;
@@ -331,7 +332,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                         width: double.infinity,
                         height: 50,
                         child: Material(
-                          color: _allPermissionsProcessed ? const Color(0xFFFF85A2) : Colors.grey.shade400,
+                          color: _allPermissionsProcessed ? themeService.primary : Colors.grey.shade400,
                           borderRadius: BorderRadius.circular(16),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(16),

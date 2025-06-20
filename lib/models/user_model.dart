@@ -178,4 +178,33 @@ class UserModel extends ChangeNotifier {
       themeColor: map['themeColor'] ?? 'pink',
     );
   }
+
+  // Add method to sync with another UserModel instance (for DataService integration)
+  void syncWith(UserModel other) {
+    if (_isBatchUpdating) return; // Prevent recursive updates
+    
+    _isBatchUpdating = true;
+    _id = other._id;
+    _name = other._name;
+    _email = other._email;
+    _photoUrl = other._photoUrl;
+    _profileImagePath = other._profileImagePath;
+    _createdAt = other._createdAt;
+    _lastLogin = other._lastLogin;
+    _onboardingCompleted = other._onboardingCompleted;
+    _isDarkMode = other._isDarkMode;
+    _notificationsEnabled = other._notificationsEnabled;
+    _colorSeed = other._colorSeed;
+    _theme = other._theme;
+    _themeColor = other._themeColor;
+    _isBatchUpdating = false;
+    
+    notifyListeners();
+    debugPrint('🔄 UserModel synced with external data: ${_name}');
+  }
+
+  // Add method to refresh from SharedPreferences (for real-time updates)
+  Future<void> refresh() async {
+    await initialize();
+  }
 }

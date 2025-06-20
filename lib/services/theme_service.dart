@@ -1,34 +1,147 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+// Color Palette Definitions
+class ColorPalette {
+  final String name;
+  final String icon;
+  final Color primary;
+  final Color secondary;
+  final Color accent;
+  final Color deep;
+  final List<Color> lightGradient;
+  final List<Color> darkGradient;
+
+  const ColorPalette({
+    required this.name,
+    required this.icon,
+    required this.primary,
+    required this.secondary,
+    required this.accent,
+    required this.deep,
+    required this.lightGradient,
+    required this.darkGradient,
+  });
+}
+
 class ThemeService extends ChangeNotifier {
   late ThemeData _lightTheme;
   late ThemeData _darkTheme;
   late bool _isDarkMode;
+  late ColorPalette _selectedPalette;
   
-  // Only keeping a single pink color for consistency
-  static const Color primaryPink = Color(0xFFFF85A2);
-  static const Color darkPink = Color(0xFF9E1A5A);
-  
-  // Animation duration for theme transitions
-  static const Duration animationDuration = Duration(milliseconds: 500);
+  // Available color palettes
+  static const List<ColorPalette> availablePalettes = [
+    ColorPalette(
+      name: 'Rose Garden',
+      icon: '🌹',
+      primary: Color(0xFFFF85A2),
+      secondary: Color(0xFFFF6B94),
+      accent: Color(0xFFFF94B3),
+      deep: Color(0xFF9E1A5A),
+      lightGradient: [Color(0xFFFF85A2), Color(0xFFFF6B94)],
+      darkGradient: [Color(0xFFFF6B94), Color(0xFF9E1A5A)],
+    ),
+    ColorPalette(
+      name: 'Ocean Breeze',
+      icon: '🌊',
+      primary: Color(0xFF4A9EFF),
+      secondary: Color(0xFF2E86FF),
+      accent: Color(0xFF66B3FF),
+      deep: Color(0xFF1B5AA0),
+      lightGradient: [Color(0xFF4A9EFF), Color(0xFF2E86FF)],
+      darkGradient: [Color(0xFF2E86FF), Color(0xFF1B5AA0)],
+    ),
+    ColorPalette(
+      name: 'Forest Trail',
+      icon: '🌲',
+      primary: Color(0xFF4CAF50),
+      secondary: Color(0xFF45A049),
+      accent: Color(0xFF66BB6A),
+      deep: Color(0xFF2E7D32),
+      lightGradient: [Color(0xFF4CAF50), Color(0xFF45A049)],
+      darkGradient: [Color(0xFF45A049), Color(0xFF2E7D32)],
+    ),
+    ColorPalette(
+      name: 'Sunset Glow',
+      icon: '🌅',
+      primary: Color(0xFFFF6B35),
+      secondary: Color(0xFFFF5722),
+      accent: Color(0xFFFF8A65),
+      deep: Color(0xFFD84315),
+      lightGradient: [Color(0xFFFF6B35), Color(0xFFFF5722)],
+      darkGradient: [Color(0xFFFF5722), Color(0xFFD84315)],
+    ),
+    ColorPalette(
+      name: 'Royal Purple',
+      icon: '👑',
+      primary: Color(0xFF9C27B0),
+      secondary: Color(0xFF8E24AA),
+      accent: Color(0xFFBA68C8),
+      deep: Color(0xFF6A1B9A),
+      lightGradient: [Color(0xFF9C27B0), Color(0xFF8E24AA)],
+      darkGradient: [Color(0xFF8E24AA), Color(0xFF6A1B9A)],
+    ),
+    ColorPalette(
+      name: 'Midnight Sky',
+      icon: '🌌',
+      primary: Color(0xFF3F51B5),
+      secondary: Color(0xFF3949AB),
+      accent: Color(0xFF7986CB),
+      deep: Color(0xFF283593),
+      lightGradient: [Color(0xFF3F51B5), Color(0xFF3949AB)],
+      darkGradient: [Color(0xFF3949AB), Color(0xFF283593)],
+    ),
+    ColorPalette(
+      name: 'Golden Hour',
+      icon: '✨',
+      primary: Color(0xFFFFC107),
+      secondary: Color(0xFFFFB300),
+      accent: Color(0xFFFFD54F),
+      deep: Color(0xFFFF8F00),
+      lightGradient: [Color(0xFFFFC107), Color(0xFFFFB300)],
+      darkGradient: [Color(0xFFFFB300), Color(0xFFFF8F00)],
+    ),
+    ColorPalette(
+      name: 'Cherry Blossom',
+      icon: '🌸',
+      primary: Color(0xFFE91E63),
+      secondary: Color(0xFFD81B60),
+      accent: Color(0xFFF48FB1),
+      deep: Color(0xFFC2185B),
+      lightGradient: [Color(0xFFE91E63), Color(0xFFD81B60)],
+      darkGradient: [Color(0xFFD81B60), Color(0xFFC2185B)],
+    ),
+  ];
+
+  // App color palette
+  static const Color warningColor = Color(0xFFFF9500);
+  static const Color errorColor = Color(0xFFFF3B30);
   
   // Getters
   ThemeData get lightTheme => _lightTheme;
   ThemeData get darkTheme => _darkTheme;
   ThemeData get currentTheme => _isDarkMode ? _darkTheme : _lightTheme;
   bool get isDarkMode => _isDarkMode;
-  Color get primaryColor => _isDarkMode ? darkPink : primaryPink;
+  ColorPalette get selectedPalette => _selectedPalette;
+  Color get primary => _isDarkMode ? _selectedPalette.secondary : _selectedPalette.primary;
+  List<Color> get lightGradient => _selectedPalette.lightGradient;
+  List<Color> get darkGradient => _selectedPalette.darkGradient;
   
-  // Add an initialize method
+  // Initialize method
   Future<void> initialize() async {
     // Load preferences
     try {
       final prefs = await SharedPreferences.getInstance();
       _isDarkMode = prefs.getBool('dark_mode') ?? false;
+      
+      // Load selected palette
+      final savedPaletteIndex = prefs.getInt('color_palette') ?? 0;
+      _selectedPalette = availablePalettes[savedPaletteIndex.clamp(0, availablePalettes.length - 1)];
     } catch (e) {
-      debugPrint('Error loading theme preference: $e');
+      debugPrint('Error loading theme preferences: $e');
       _isDarkMode = false;
+      _selectedPalette = availablePalettes[0]; // Default to Rose Garden
     }
     
     // Initialize themes
@@ -38,45 +151,52 @@ class ThemeService extends ChangeNotifier {
     notifyListeners();
   }
   
-  // Toggle dark mode without triggering navigation
+  // Toggle dark mode
   Future<void> toggleTheme() async {
-    // Store the current theme state
-    final previousIsDarkMode = _isDarkMode;
-    
-    // Toggle the theme state
     _isDarkMode = !_isDarkMode;
     
     // Save the new theme preference
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('dark_mode', _isDarkMode);
     
-    // Do not reset or modify any other navigation flags
-    // This ensures we stay on the current screen when toggling theme
-    
     // Notify listeners about the change
     notifyListeners();
   }
   
+  // Change color palette
+  Future<void> changeColorPalette(int paletteIndex) async {
+    if (paletteIndex >= 0 && paletteIndex < availablePalettes.length) {
+      _selectedPalette = availablePalettes[paletteIndex];
+      
+      // Recreate themes with new palette
+      _lightTheme = _createLightTheme();
+      _darkTheme = _createDarkTheme();
+      
+      // Save the new palette preference
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('color_palette', paletteIndex);
+      
+      // Notify listeners about the change
+      notifyListeners();
+    }
+  }
+  
   ThemeData _createLightTheme() {
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: primaryPink,
+      seedColor: primary,
       brightness: Brightness.light,
-      primaryContainer: primaryPink.withOpacity(0.15),
-      secondaryContainer: primaryPink.withOpacity(0.1),
-      surfaceTint: primaryPink.withOpacity(0.05),
-      surface: Colors.white,
-      background: const Color(0xFFFAF8FC), // Subtle background with a hint of pink
-      onBackground: const Color(0xFF202025),
-      onSurface: const Color(0xFF303035),
+      primary: primary,
+      secondary: _selectedPalette.secondary,
+      tertiary: _selectedPalette.accent,
+      error: errorColor,
     );
     
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
       brightness: Brightness.light,
-      scaffoldBackgroundColor: colorScheme.background,
       
-      // Card theme with 3D shadow effect instead of glossy look
+      // Card theme
       cardTheme: CardTheme(
         elevation: 3.0,
         shadowColor: Colors.black.withOpacity(0.15),
@@ -89,7 +209,7 @@ class ThemeService extends ChangeNotifier {
         margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
       ),
       
-      // Enhanced button themes
+      // Button themes
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: colorScheme.primary,
@@ -108,7 +228,7 @@ class ThemeService extends ChangeNotifier {
         ),
       ),
       
-      // Switch theme with improved visuals
+      // Switch theme
       switchTheme: SwitchThemeData(
         thumbColor: MaterialStateProperty.resolveWith((states) {
           if (states.contains(MaterialState.selected)) {
@@ -130,7 +250,7 @@ class ThemeService extends ChangeNotifier {
         }),
       ),
       
-      // Text theme with cleaner typography
+      // Text theme
       textTheme: TextTheme(
         displayLarge: TextStyle(
           fontSize: 26,
@@ -172,7 +292,7 @@ class ThemeService extends ChangeNotifier {
         ),
       ),
       
-      // Enhanced bottom navigation bar theme
+      // Bottom navigation bar theme
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: colorScheme.surface,
         selectedItemColor: colorScheme.primary,
@@ -187,37 +307,42 @@ class ThemeService extends ChangeNotifier {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-        tileColor: Colors.transparent,
-        selectedTileColor: colorScheme.primary.withOpacity(0.1),
-        iconColor: colorScheme.primary,
-        textColor: colorScheme.onSurface,
+      ),
+      
+      // App bar theme
+      appBarTheme: AppBarTheme(
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        elevation: 0,
+        centerTitle: true,
+        titleTextStyle: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: colorScheme.onSurface,
+        ),
       ),
     );
   }
   
   ThemeData _createDarkTheme() {
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: darkPink,
+      seedColor: primary,
       brightness: Brightness.dark,
-      primaryContainer: darkPink.withOpacity(0.2),
-      secondaryContainer: darkPink.withOpacity(0.15),
-      surfaceTint: darkPink.withOpacity(0.1),
-      surface: const Color(0xFF2A2A38),
-      background: const Color(0xFF1E1E2A), // Deeper, richer dark background
-      onBackground: Colors.white.withOpacity(0.95),
-      onSurface: Colors.white.withOpacity(0.95),
+      primary: _selectedPalette.secondary,
+      secondary: primary,
+      tertiary: _selectedPalette.accent,
+      error: errorColor,
     );
     
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: colorScheme.background,
       
-      // Card theme with 3D shadow effect
+      // Card theme
       cardTheme: CardTheme(
-        elevation: 4.0,
-        shadowColor: darkPink.withOpacity(0.3),
+        elevation: 3.0,
+        shadowColor: Colors.black.withOpacity(0.3),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
@@ -227,13 +352,13 @@ class ThemeService extends ChangeNotifier {
         margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
       ),
       
-      // Enhanced button themes
+      // Button themes
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: colorScheme.primary,
           foregroundColor: colorScheme.onPrimary,
-          elevation: 3,
-          shadowColor: darkPink.withOpacity(0.4),
+          elevation: 2,
+          shadowColor: colorScheme.primary.withOpacity(0.2),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -246,17 +371,17 @@ class ThemeService extends ChangeNotifier {
         ),
       ),
       
-      // Switch theme with improved visuals for dark mode
+      // Switch theme
       switchTheme: SwitchThemeData(
         thumbColor: MaterialStateProperty.resolveWith((states) {
           if (states.contains(MaterialState.selected)) {
-            return colorScheme.primary;
+            return _selectedPalette.deep;
           }
-          return Colors.white70;
+          return colorScheme.outline;
         }),
         trackColor: MaterialStateProperty.resolveWith((states) {
           if (states.contains(MaterialState.selected)) {
-            return colorScheme.primary.withOpacity(0.4);
+            return _selectedPalette.deep.withOpacity(0.3);
           }
           return colorScheme.surfaceVariant;
         }),
@@ -264,11 +389,11 @@ class ThemeService extends ChangeNotifier {
           if (states.contains(MaterialState.selected)) {
             return Colors.transparent;
           }
-          return colorScheme.outline.withOpacity(0.3);
+          return colorScheme.outline.withOpacity(0.5);
         }),
       ),
       
-      // Text theme with lighter weights for better legibility in dark mode
+      // Text theme
       textTheme: TextTheme(
         displayLarge: TextStyle(
           fontSize: 26,
@@ -286,12 +411,12 @@ class ThemeService extends ChangeNotifier {
         ),
         bodyLarge: TextStyle(
           fontSize: 16,
-          color: colorScheme.onBackground.withOpacity(0.9),
+          color: colorScheme.onBackground,
           height: 1.5,
         ),
         bodyMedium: TextStyle(
           fontSize: 14,
-          color: colorScheme.onBackground.withOpacity(0.9),
+          color: colorScheme.onBackground,
           height: 1.5,
         ),
       ),
@@ -299,8 +424,7 @@ class ThemeService extends ChangeNotifier {
       // Dialog theme
       dialogTheme: DialogTheme(
         backgroundColor: colorScheme.surface,
-        elevation: 5,
-        shadowColor: darkPink.withOpacity(0.3),
+        elevation: 3,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
@@ -311,25 +435,34 @@ class ThemeService extends ChangeNotifier {
         ),
       ),
       
-      // Enhanced bottom navigation bar theme for dark mode
+      // Bottom navigation bar theme
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: colorScheme.surface,
-        selectedItemColor: Colors.white,
+        selectedItemColor: _selectedPalette.deep,
         unselectedItemColor: colorScheme.onSurfaceVariant,
         elevation: 8,
         type: BottomNavigationBarType.fixed,
       ),
       
-      // List tile theme for dark mode
+      // List tile theme
       listTileTheme: ListTileThemeData(
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-        tileColor: Colors.transparent,
-        selectedTileColor: colorScheme.primary.withOpacity(0.15),
-        iconColor: Colors.white,
-        textColor: colorScheme.onSurface,
+      ),
+      
+      // App bar theme
+      appBarTheme: AppBarTheme(
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        elevation: 0,
+        centerTitle: true,
+        titleTextStyle: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: colorScheme.onSurface,
+        ),
       ),
     );
   }

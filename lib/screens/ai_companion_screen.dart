@@ -400,6 +400,11 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
         _handleClearConversation();
       } else if (action == 'clear_all_conversations') {
         _handleClearAllConversations();
+      } else if (action == 'delete_conversation') {
+        final conversationId = result['conversation_id'];
+        if (conversationId != null) {
+          await _handleDeleteConversation(conversationId);
+        }
       }
     }
   }
@@ -422,6 +427,10 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
       setState(() {
         _currentConversation = newConversation;
         _currentConversationId = newConversation.id;
+        
+        // Update the static saved conversation
+        AICompanionScreen._savedConversation = newConversation;
+        AICompanionScreen._savedConversationId = newConversation.id;
       });
       
       // Now delete the old conversation
@@ -462,6 +471,10 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
       setState(() {
         _currentConversation = newConversation;
         _currentConversationId = newConversation.id;
+        
+        // Update the static saved conversation
+        AICompanionScreen._savedConversation = newConversation;
+        AICompanionScreen._savedConversationId = newConversation.id;
       });
       
       // Clear all conversations
@@ -477,6 +490,52 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error clearing conversations: $e')),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _handleDeleteConversation(String conversationId) async {
+          setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // If we're deleting the current conversation, create a new one first
+      if (conversationId == _currentConversationId) {
+      final newConversation = await _aiService.createConversation();
+        
+        // Update the UI with the new conversation
+        setState(() {
+          _currentConversation = newConversation;
+          _currentConversationId = newConversation.id;
+          
+          // Update the static saved conversation
+          AICompanionScreen._savedConversation = newConversation;
+          AICompanionScreen._savedConversationId = newConversation.id;
+        });
+  }
+
+      // Delete the conversation
+      await _aiService.deleteConversation(conversationId);
+      
+      // Reload conversations list
+      await _aiService.loadConversations();
+      
+      // Show confirmation
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Conversation deleted')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting conversation: $e')),
         );
       }
     } finally {
@@ -513,159 +572,175 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
       });
     }
     
-    return Scaffold(
-      // Make the screen responsive to keyboard
-      resizeToAvoidBottomInset: false,
-      // Replace the AppHeader with a transparent AppBar
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor?.withOpacity(0.8),
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          'AI Companion',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
+    return Stack(
+            children: [
+        // WaveDotGrid animated background that extends behind navigation bars
+        const Positioned.fill(
+          child: ChatAnimatedBackground(),
         ),
-      ),
-      // Use our new animated background
-      extendBodyBehindAppBar: true, // Extend the body behind the app bar
-      body: SafeArea(
-        bottom: false, // Don't apply bottom safe area to allow keyboard overlay
-        child: Column(
-          children: [
-            // Menu button row
-            Padding(
-              padding: const EdgeInsets.only(left: 10.0, top: 4.0, bottom: 4.0),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.menu),
-                    color: isDarkMode ? Colors.white70 : Colors.black54,
-                    onPressed: _showConversationsDialog,
-                  ),
-                ],
+        // Main content with padding for navigation bars
+        SafeArea(
+          bottom: false, // Don't apply bottom safe area to allow keyboard overlay
+                              child: Column(
+                                children: [
+              // Main content area - fills all available space
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 0),
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _errorMessage != null
+                          ? Center(child: Text(_errorMessage!))
+                          : _buildChatBody(colorScheme, isDarkMode, userModel),
+                ),
               ),
-            ),
-            
-            // Main content area - fills all available space
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 0),
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _errorMessage != null
-                        ? Center(child: Text(_errorMessage!))
-                        : _buildChatBody(colorScheme, isDarkMode, userModel),
-              ),
-            ),
-            
-            // Input field area with minimal spacing
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: EdgeInsets.only(
-                left: 8.0, 
-                right: 8.0, 
-                bottom: isKeyboardVisible ? 0 : 8.0, // Remove bottom padding when keyboard is visible
-                top: 2.0, // Reduced top padding
-              ),
-              child: Row(
-                children: [
-                  // Expanded text input with rounded corners
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24.0),
-                      child: TextField(
-                        controller: _messageController,
-                        focusNode: _messageFocusNode,
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black87,
-                          fontSize: 16,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Type a message...',
-                          hintStyle: TextStyle(
-                            color: isDarkMode ? Colors.white70 : Colors.black54,
+              
+              // Input field area with minimal spacing
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom), // Add bottom margin for safe area
+                padding: EdgeInsets.only(
+                  left: 8.0, 
+                  right: 8.0, 
+                  bottom: isKeyboardVisible ? 8.0 : 16.0, // Ensure some bottom padding
+                  top: 8.0, // Increased top padding for better spacing
+                ),
+                child: Row(
+                  children: [
+                    // Expanded text input with rounded corners
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24.0),
+                        child: TextField(
+                          controller: _messageController,
+                          focusNode: _messageFocusNode,
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black87,
                             fontSize: 16,
                           ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 14.0,
+                          decoration: InputDecoration(
+                            hintText: 'Type a message...',
+                            hintStyle: TextStyle(
+                              color: isDarkMode ? Colors.white70 : Colors.black54,
+                              fontSize: 16,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16.0,
+                              vertical: 14.0,
+                            ),
+                            filled: true,
+                            fillColor: Theme.of(context).cardColor.withOpacity(0.8),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24.0),
+                              borderSide: BorderSide.none,
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24.0),
+                              borderSide: BorderSide(
+                                color: colorScheme.primary.withOpacity(0.5),
+                                width: 1.5,
+                              ),
+                            ),
                           ),
-                          filled: true,
-                          fillColor: Theme.of(context).cardColor.withOpacity(0.8),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(24.0),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(24.0),
-                            borderSide: BorderSide(
-                              color: colorScheme.primary.withOpacity(0.5),
-                              width: 1.5,
+                          textInputAction: TextInputAction.send,
+                          minLines: 1,
+                          maxLines: 4,
+                          onSubmitted: (_) => _sendMessage(),
+                        ),
+                      ),
+                    ),
+                    
+                    // Send button next to text field
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8.0),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(25),
+                        onTap: _isAITyping ? null : _sendMessage,
+                        child: Padding(
+                          padding: const EdgeInsets.all(4.0),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            width: 45,
+                            height: 45,
+                            decoration: BoxDecoration(
+                              gradient: RadialGradient(
+                                center: const Alignment(0.0, 0.0),
+                                radius: 0.8,
+                                colors: isDarkMode 
+                                  ? themeService.darkGradient
+                                  : themeService.lightGradient,
+                                stops: const [0.0, 1.0],
+                              ),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.send_rounded,
+                              color: Colors.white,
+                              size: 22,
                             ),
                           ),
                         ),
-                        textInputAction: TextInputAction.send,
-                        minLines: 1,
-                        maxLines: 4,
-                        onSubmitted: (_) => _sendMessage(),
                       ),
                     ),
+                  ],
+                ),
+              ),
+                ],
+          ),
+              ),
+              
+        // Hamburger menu button positioned in top-left corner
+              Positioned(
+                top: 16,
+                left: 16,
+          child: SafeArea(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: const Alignment(0.0, 0.0),
+                      radius: 0.8,
+                      colors: isDarkMode 
+                    ? themeService.darkGradient
+                    : themeService.lightGradient,
+                      stops: const [0.0, 1.0],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  
-                  // Send button next to text field
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8.0),
+                  child: Material(
+                    color: Colors.transparent,
                     child: InkWell(
                       borderRadius: BorderRadius.circular(25),
-                      onTap: _isAITyping ? null : _sendMessage,
-                      child: Padding(
-                        padding: const EdgeInsets.all(4.0),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          width: 45,
-                          height: 45,
-                          decoration: BoxDecoration(
-                            gradient: RadialGradient(
-                              center: const Alignment(0.0, 0.0),
-                              radius: 0.8,
-                              colors: isDarkMode 
-                                ? [
-                                    const Color(0xFF8E2A55), // Softer dark pink
-                                    const Color(0xFF702040), // Softer darker pink
-                                  ]
-                                : [
-                                    const Color(0xFFFF9BAD), // Light pink
-                                    const Color(0xFFFF85A2), // Slightly darker pink
-                                  ],
-                              stops: const [0.0, 1.0],
-                            ),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: (isDarkMode ? Colors.black : Colors.grey).withOpacity(0.2),
-                                blurRadius: 5,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.send_rounded,
-                            color: Colors.white,
-                            size: 22,
-                          ),
+                  onTap: () => _showConversationsDialog(),
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        child: const Icon(
+                          Icons.menu,
+                          color: Colors.white,
+                          size: 24,
                         ),
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
 
@@ -684,25 +759,44 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
               child: SingleChildScrollView(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+                  child: Card(
+                    elevation: 8,
+                    shadowColor: Colors.black.withOpacity(0.15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    color: isDarkMode 
+                        ? const Color(0xFF2A2A3C).withOpacity(0.95)
+                        : Colors.white.withOpacity(0.95),
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
                   child: Column(
+                        mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
                         Icons.chat_bubble_outline_rounded,
-                        size: 64,
-                        color: colorScheme.primary.withOpacity(0.5),
+                              size: 48,
+                              color: colorScheme.primary,
                       ),
-                      const SizedBox(height: 16),
+                          ),
+                          const SizedBox(height: 24),
                       Text(
                         'Welcome to your AI Companion!',
                         style: TextStyle(
-                          fontSize: 20,
+                              fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: isDarkMode ? Colors.white : Colors.black87,
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 8),
+                          const SizedBox(height: 12),
                       Text(
                         'Start a conversation by typing a message below.',
                         style: TextStyle(
@@ -711,7 +805,7 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 24),
+                          const SizedBox(height: 16),
                       Text(
                         'You can ask me anything, and I\'ll do my best to help! 💖',
                         style: TextStyle(
@@ -721,6 +815,8 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
                         textAlign: TextAlign.center,
                       ),
                     ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -830,24 +926,24 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
                 horizontal: 16.0,
                 vertical: _isKeyboardVisible ? 8.0 : 12.0, // Reduce padding when keyboard is visible
               ),
-              decoration: BoxDecoration(
+            decoration: BoxDecoration(
                 color: Theme.of(context).cardColor.withOpacity(0.85),
-                borderRadius: const BorderRadius.only(
+              borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(4.0),
-                  topRight: Radius.circular(20.0),
+                topRight: Radius.circular(20.0),
                   bottomLeft: Radius.circular(20.0),
-                  bottomRight: Radius.circular(20.0),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 5,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                bottomRight: Radius.circular(20.0),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                    blurRadius: 5,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
                 children: List.generate(
                   3,
                   (i) => AnimatedDot(delay: i * 0.3),
@@ -878,6 +974,7 @@ class ConversationsDialog extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
+    final themeService = Provider.of<ThemeService>(context);
     final colorScheme = Theme.of(context).colorScheme;
     final dialogBackgroundColor = isDarkMode ? const Color(0xFF272741) : Colors.white;
     final textColor = isDarkMode ? Colors.white : Colors.black87;
@@ -903,10 +1000,7 @@ class ConversationsDialog extends StatelessWidget {
                 gradient: RadialGradient(
                   center: const Alignment(0.0, -0.5),
                   radius: 1.5,
-                  colors: [
-                    const Color(0xFFFF85A2), // Light pink
-                    const Color(0xFFFF6B94), // Slightly darker pink
-                      ],
+                  colors: themeService.lightGradient,
                   stops: const [0.0, 1.0],
                 ),
                 borderRadius: const BorderRadius.only(
@@ -978,7 +1072,7 @@ class ConversationsDialog extends StatelessWidget {
                             Icon(
                               Icons.chat_bubble_outline,
                               size: 64,
-                              color: const Color(0xFFFF85A2).withOpacity(0.5),
+                              color: themeService.primary.withOpacity(0.5),
                             ),
                             const SizedBox(height: 16),
                             Text(
@@ -1038,9 +1132,9 @@ class ConversationsDialog extends StatelessWidget {
                       
                       return ListTile(
                         selected: isSelected,
-                        selectedTileColor: const Color(0xFFFF85A2).withOpacity(0.1),
+                        selectedTileColor: themeService.primary.withOpacity(0.1),
                         leading: CircleAvatar(
-                          backgroundColor: const Color(0xFFFF85A2).withOpacity(0.2),
+                                                      backgroundColor: themeService.primary.withOpacity(0.2),
                           child: const Text('🌸', style: TextStyle(fontSize: 16)),
                         ),
                         title: Text(
@@ -1059,12 +1153,50 @@ class ConversationsDialog extends StatelessWidget {
                             color: secondaryTextColor,
                           ),
                         ),
-                        trailing: Text(
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
                           formattedDate,
                           style: TextStyle(
                             fontSize: 12,
                             color: secondaryTextColor,
                           ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: Icon(
+                                Icons.delete_outline,
+                                size: 20,
+                                color: secondaryTextColor,
+                              ),
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Delete Conversation'),
+                                    content: const Text('Are you sure you want to delete this conversation? This action cannot be undone.'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('CANCEL'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.pop(context); // Close confirmation dialog
+                                          Navigator.pop(context, { // Close main dialog
+                                            'action': 'delete_conversation',
+                                            'conversation_id': conversation.id,
+                                          });
+                                        },
+                                        child: const Text('DELETE'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
                         onTap: () {
                           Navigator.pop(context, {
@@ -1396,16 +1528,16 @@ class _AnimatedMessageState extends State<AnimatedMessage> with SingleTickerProv
                 
                 // Timestamp below message - hide when keyboard is visible to save space
                 if (!widget.isKeyboardVisible)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4.0, left: 4.0, right: 4.0),
-                    child: Text(
-                      formattedTime,
-                      style: TextStyle(
-                        fontSize: 11,
+                Padding(
+                  padding: const EdgeInsets.only(top: 4.0, left: 4.0, right: 4.0),
+                  child: Text(
+                    formattedTime,
+                    style: TextStyle(
+                      fontSize: 11,
                         color: Theme.of(context).textTheme.bodySmall?.color ?? (widget.isDarkMode ? Colors.white70 : Colors.black54),
-                      ),
                     ),
-                  )
+                  ),
+                )
               ],
             ),
           ),
@@ -1491,13 +1623,13 @@ class _AnimatedDotState extends State<AnimatedDot> with SingleTickerProviderStat
       builder: (context, child) {
         return Transform.translate(
           offset: Offset(0, -4 * _animation.value),
-          child: Container(
-            width: 8,
-            height: 8,
+            child: Container(
+              width: 8,
+              height: 8,
             margin: const EdgeInsets.symmetric(horizontal: 2),
-            decoration: BoxDecoration(
-              color: isDarkMode ? Colors.white70 : Colors.black54,
-              shape: BoxShape.circle,
+              decoration: BoxDecoration(
+                color: isDarkMode ? Colors.white70 : Colors.black54,
+                shape: BoxShape.circle,
             ),
           ),
         );

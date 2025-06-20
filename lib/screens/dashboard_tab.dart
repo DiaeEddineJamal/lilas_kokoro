@@ -1,22 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../services/theme_service.dart';
 import '../services/data_service.dart';
 import '../models/user_model.dart';
 import '../widgets/skeleton_loader.dart';
 import '../services/skeleton_service.dart';
+
+
 import 'ai_companion_screen.dart';
 import 'reminders_screen.dart';
 import 'love_counter_screen.dart';
 import 'profile_edit_screen.dart';
-import '../widgets/app_header.dart';
+import 'reminder_editor_screen.dart';
 import '../models/chat_message_model.dart';
 import '../services/ai_companion_service.dart';
 import '../routes.dart';
 import 'dart:io';
 
 class DashboardTab extends StatefulWidget {
-  const DashboardTab({Key? key}) : super(key: key);
+  final Function(int)? onTabChange;
+  
+  const DashboardTab({Key? key, this.onTabChange}) : super(key: key);
 
   @override
   State<DashboardTab> createState() => _DashboardTabState();
@@ -26,6 +31,12 @@ class _DashboardTabState extends State<DashboardTab> {
   // Store DataService instance
   late DataService _dataService;
   late AICompanionService _aiService;
+  
+  // Cache data to prevent flickering
+  List<dynamic>? _cachedReminders;
+  List<ChatConversation>? _cachedConversations;
+  bool _isLoadingReminders = false;
+  bool _isLoadingConversations = false;
 
   @override
   void initState() {
@@ -54,11 +65,49 @@ class _DashboardTabState extends State<DashboardTab> {
 
   Future<void> _loadData() async {
     final skeletonService = Provider.of<SkeletonService>(context, listen: false);
-    // Remove skeletonService.showLoader();
+    
+    // Load reminders and conversations in parallel
+    setState(() {
+      _isLoadingReminders = true;
+      _isLoadingConversations = true;
+    });
+    
+    try {
+      final results = await Future.wait([
+        _dataService.getReminders(),
+        _aiService.getConversations(),
+      ]);
+      
+      if (mounted) {
+        setState(() {
+          _cachedReminders = results[0] as List<dynamic>?;
+          _cachedConversations = results[1] as List<ChatConversation>?;
+          _isLoadingReminders = false;
+          _isLoadingConversations = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingReminders = false;
+          _isLoadingConversations = false;
+        });
+      }
+    }
+    
     // Simulate loading or fetch actual data
-    await Future.delayed(const Duration(milliseconds: 1200));
+    await Future.delayed(const Duration(milliseconds: 300));
     if (mounted) {
       skeletonService.hideLoader();
+    }
+  }
+
+  Future<void> _onRefresh() async {
+    final skeletonService = Provider.of<SkeletonService>(context, listen: false);
+    skeletonService.showLoader();
+    await _loadData();
+    if (mounted) {
+      setState(() {}); // Trigger rebuild to refresh user data
     }
   }
 
@@ -70,283 +119,163 @@ class _DashboardTabState extends State<DashboardTab> {
     final userModel = Provider.of<UserModel>(context);
     final skeletonService = Provider.of<SkeletonService>(context);
 
-    return Scaffold(
-      body: Column(
-        children: [
-          // Using our custom AppHeader with profile button
-          AppHeader(
-            title: 'Lilas Kokoro',
-        actions: [
-              // Remove the Profile Icon Button
-              // IconButton(
-              //   icon: Icon(Icons.account_circle_rounded, size: 28, color: textColor),
-              //   onPressed: () {
-              //     // TODO: Navigate to profile or show settings
-              //   },
-              // ),
-              // Consider adding other actions if needed
-              // IconButton(
-              //   icon: Icon(Icons.notifications_none_rounded, size: 28, color: textColor),
-              //   onPressed: () {
-              //     // TODO: Navigate to notifications
-              //   },
-              // ),
-        ],
-      ),
-          
-          // Content in an expanded widget
-          Expanded(
-        child: SafeArea(
-              top: false, // Already handled by AppHeader
-              child: SkeletonLoaderFixed(
-                isLoading: skeletonService.isLoading,
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header with greeting
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Hello, ${userModel.name}! 👋',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: isDarkMode ? Colors.white : Colors.black87,
+    return SkeletonLoaderFixed(
+      isLoading: skeletonService.isLoading,
+      child: RefreshIndicator(
+        onRefresh: _onRefresh,
+        color: themeService.primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header with greeting
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Hello, ${userModel.name}! 👋',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: isDarkMode ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                        Text(
+                          'Welcome to your kawaii companion',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                          // Wrap CircleAvatar with GestureDetector for tap action
+                          GestureDetector(
+                            onTap: () async {
+                              // Navigate to ProfileEditScreen using consistent app navigation
+                              await context.push('/profile-edit');
+                              
+                              // Trigger a rebuild to refresh user data
+                              if (mounted) {
+                                setState(() {}); // Rebuild with latest user data
+                              }
+                            },
+                            child: CircleAvatar(
+                              backgroundColor: themeService.primary,
+                              radius: 24,
+                              backgroundImage: userModel.profileImagePath != null && userModel.profileImagePath!.isNotEmpty
+                                ? FileImage(File(userModel.profileImagePath!))
+                                : null,
+                              child: userModel.profileImagePath == null || userModel.profileImagePath!.isEmpty
+                                ? Text(
+                                    userModel.name.isNotEmpty ? userModel.name[0].toUpperCase() : 'G',
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : null,
                             ),
                           ),
-                          Text(
-                            'Welcome to your kawaii companion',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                            // Wrap CircleAvatar with GestureDetector for tap action
-                            GestureDetector(
-                              onTap: () async {
-                                // Navigate to ProfileEditScreen
-                                final result = await Navigator.push(
-                                  context,
-                                  SmoothPageRoute(
-                                    page: const ProfileEditScreen(),
-                                    transitionType: TransitionType.scale,
-                                  ),
-                                );
-                                
-                                // If changes were made (result == true), trigger a rebuild
-                                if (result == true && mounted) {
-                                  setState(() {}); // Rebuild with latest user data
-                                }
-                              },
-                              child: CircleAvatar(
-                                backgroundColor: const Color(0xFFFF85A2),
-                                radius: 24,
-                                backgroundImage: userModel.profileImagePath != null && userModel.profileImagePath!.isNotEmpty
-                                  ? FileImage(File(userModel.profileImagePath!))
-                                  : null,
-                                child: userModel.profileImagePath == null || userModel.profileImagePath!.isEmpty
-                                  ? Text(
-                                      userModel.name.isNotEmpty ? userModel.name[0].toUpperCase() : 'G',
-                                      style: const TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : null,
-                              ),
-                            ),
-                    ],
+                  ],
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Quick actions
+                Text(
+                  'Quick Actions',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDarkMode ? Colors.white : Colors.black87,
                   ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Quick actions
-                  Text(
-                    'Quick Actions',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: isDarkMode ? Colors.white : Colors.black87,
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildQuickActionButton(
+                      context,
+                      'Add Reminder',
+                      Icons.notifications_active_rounded,
+                      themeService.primary,
+                      () {
+                        // Navigate to Reminders tab (index 1)
+                        widget.onTabChange?.call(1);
+                      },
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildQuickActionButton(
-                        context,
-                        'Add Reminder',
-                        Icons.notifications_active_rounded,
-                        const Color(0xFFFF85A2),
-                        () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const RemindersScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                      _buildQuickActionButton(
-                        context,
-                        'AI Chat',
-                        Icons.chat_bubble_rounded,
-                        const Color(0xFF9C89FF),
-                        () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const AICompanionScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                      _buildQuickActionButton(
-                        context,
-                        'Love Counter',
-                        Icons.favorite_rounded,
-                        const Color(0xFFFF6B6B),
-                        () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const LoveCounterScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Upcoming reminders
-                  Text(
-                    'Upcoming Reminders',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: isDarkMode ? Colors.white : Colors.black87,
+                    _buildQuickActionButton(
+                      context,
+                      'AI Chat',
+                      Icons.chat_bubble_rounded,
+                      themeService.selectedPalette.secondary,
+                      () {
+                        // Navigate to AI Companion tab (index 3)
+                        widget.onTabChange?.call(3);
+                      },
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  FutureBuilder(
-                          future: _dataService.getReminders(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return _buildSkeletonReminderCards();
-                      }
-                      
-                      if (!snapshot.hasData || (snapshot.data as List).isEmpty) {
-                        return _buildEmptyState(
-                          context,
-                          'No upcoming reminders',
-                          'Add your first reminder to see it here!',
-                          Icons.notifications_off_rounded,
-                        );
-                      }
-                      
-                      final reminders = snapshot.data as List;
-
-                            // Get today's date at midnight for comparison
-                            final now = DateTime.now();
-                            final today = DateTime(now.year, now.month, now.day);
-
-                      final upcomingReminders = reminders
-                                // Filter for reminders that are not completed AND are due today or later
-                                .where((r) {
-                                  final reminderDate = DateTime(r.dateTime.year, r.dateTime.month, r.dateTime.day);
-                                  return !r.isCompleted && (reminderDate.isAtSameMomentAs(today) || reminderDate.isAfter(today));
-                                })
-                          .toList();
-                      
-                      if (upcomingReminders.isEmpty) {
-                        return _buildEmptyState(
-                          context,
-                          'No upcoming reminders',
-                          'All your reminders are completed or in the past!',
-                          Icons.check_circle_outline_rounded,
-                        );
-                      }
-                      
-                      // Sort by date
-                      upcomingReminders.sort((a, b) => a.dateTime.compareTo(b.dateTime));
-                      
-                      // Take only the first 3
-                      final displayReminders = upcomingReminders.take(3).toList();
-                      
-                      return Column(
-                        children: displayReminders.map((reminder) {
-                          return _buildReminderCard(context, reminder);
-                        }).toList(),
-                      );
-                    },
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Recent AI Conversations
-                  Text(
-                    'Recent Conversations',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: isDarkMode ? Colors.white : Colors.black87,
+                    _buildQuickActionButton(
+                      context,
+                      'Love Counter',
+                      Icons.favorite_rounded,
+                      themeService.selectedPalette.accent,
+                      () {
+                        // Navigate to Love Counter tab (index 2)
+                        widget.onTabChange?.call(2);
+                      },
                     ),
+                  ],
+                ),
+                
+                const SizedBox(height: 32),
+                
+                // Recent Reminders
+                Text(
+                  'Recent Reminders',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDarkMode ? Colors.white : Colors.black87,
                   ),
-                  const SizedBox(height: 12),
-                  
-                  FutureBuilder(
-                          future: _aiService.getConversations(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return _buildSkeletonConversationCard();
-                      }
-                      
-                      final conversations = snapshot.data as List<ChatConversation>? ?? [];
-                      
-                      if (conversations.isEmpty) {
-                        return _buildEmptyState(
-                          context,
-                          'No conversations yet',
-                          'Talk to your AI companion to see them here!',
-                          Icons.chat_bubble_outline_rounded,
-                        );
-                      }
-                      
-                      // Sort by updated date (most recent first)
-                      conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-                      
-                      // Take only the first one
-                      final displayConversation = conversations.first;
-                      
-                      return _buildConversationCard(context, displayConversation);
-                    },
+                ),
+                const SizedBox(height: 12),
+                _buildRemindersSection(),
+                
+                const SizedBox(height: 32),
+                
+                // Recent AI Conversations
+                Text(
+                  'Recent AI Conversations',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDarkMode ? Colors.white : Colors.black87,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 12),
+                _buildConversationsSection(),
+                
+                const SizedBox(height: 20),
+              ],
             ),
           ),
         ),
-            ),
-          ),
-        ],
       ),
     );
   }
 
   Widget _buildSkeletonReminderCards() {
+    final themeService = Provider.of<ThemeService>(context);
+    final isDarkMode = themeService.isDarkMode;
+    
     return Column(
       children: List.generate(3, (index) => 
         Container(
@@ -354,7 +283,7 @@ class _DashboardTabState extends State<DashboardTab> {
           height: 80,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(15),
-            color: Colors.white,
+            color: isDarkMode ? const Color(0xFF383844) : Colors.white,
           ),
         )
       ),
@@ -362,11 +291,14 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   Widget _buildSkeletonConversationCard() {
+    final themeService = Provider.of<ThemeService>(context);
+    final isDarkMode = themeService.isDarkMode;
+    
     return Container(
       height: 100,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(15),
-        color: Colors.white,
+        color: isDarkMode ? const Color(0xFF383844) : Colors.white,
       ),
     );
   }
@@ -439,7 +371,7 @@ class _DashboardTabState extends State<DashboardTab> {
           Icon(
             icon,
             size: 48,
-            color: const Color(0xFFFF85A2).withOpacity(0.7),
+            color: themeService.primary.withOpacity(0.7),
           ),
           const SizedBox(height: 12),
           Text(
@@ -464,13 +396,45 @@ class _DashboardTabState extends State<DashboardTab> {
     );
   }
 
+  Widget _buildRemindersSection() {
+    if (_isLoadingReminders) {
+      return _buildSkeletonReminderCards();
+    }
+    
+    if (_cachedReminders == null) {
+      return _buildSkeletonReminderCards();
+    }
+    
+    // Filter for active reminders only, sort by date (latest first), and take 3
+    final activeReminders = _cachedReminders!
+        .where((reminder) => !reminder.isCompleted)
+        .toList()
+      ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
+    
+    final recentReminders = activeReminders.take(3).toList();
+    
+    if (recentReminders.isEmpty) {
+      return _buildEmptyState(
+        context,
+        'No active reminders',
+        'Create your first reminder to get started',
+        Icons.notifications_off_rounded,
+      );
+    }
+    
+    return Column(
+      children: recentReminders.map((reminder) => 
+        _buildReminderCard(context, reminder)
+      ).toList(),
+    );
+  }
+
   Widget _buildReminderCard(BuildContext context, dynamic reminder) {
     final themeService = Provider.of<ThemeService>(context);
     final isDarkMode = themeService.isDarkMode;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDarkMode ? const Color(0xFF383844) : Colors.white,
         borderRadius: BorderRadius.circular(15),
@@ -482,48 +446,97 @@ class _DashboardTabState extends State<DashboardTab> {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF85A2).withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Text(
-                reminder.emoji,
-                style: const TextStyle(fontSize: 24),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(15),
+          onTap: () {
+            // Navigate to reminder editor screen with the existing reminder
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ReminderEditorScreen(
+                  existingReminder: reminder,
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               children: [
-                Text(
-                  reminder.title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isDarkMode ? Colors.white : Colors.black87,
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                                         color: themeService.primary.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      reminder.emoji,
+                      style: const TextStyle(fontSize: 24),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  reminder.formattedDateTime,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDarkMode ? Colors.white60 : Colors.grey.shade600,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        reminder.title,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        reminder.formattedDateTime,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDarkMode ? Colors.white60 : Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
                   ),
+                ),
+                // Add a small edit icon to indicate it's clickable
+                Icon(
+                  Icons.edit_rounded,
+                  size: 16,
+                  color: isDarkMode ? Colors.white38 : Colors.grey.shade400,
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildConversationsSection() {
+    if (_isLoadingConversations) {
+      return _buildSkeletonConversationCard();
+    }
+    
+    if (_cachedConversations == null || _cachedConversations!.isEmpty) {
+      return _buildEmptyState(
+        context,
+        'No conversations yet',
+        'Start chatting with your AI companion',
+        Icons.chat_bubble_outline_rounded,
+      );
+    }
+    
+    final recentConversations = _cachedConversations!.take(3).toList();
+    
+    return Column(
+      children: recentConversations.map((conversation) => 
+        _buildConversationCard(context, conversation)
+      ).toList(),
     );
   }
 
@@ -537,15 +550,8 @@ class _DashboardTabState extends State<DashboardTab> {
     
     return GestureDetector(
       onTap: () {
-        // Navigate to conversation
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AICompanionScreen(
-              conversationId: conversation.id,
-            ),
-          ),
-        );
+        // Navigate to AI Companion tab (index 3)
+        widget.onTabChange?.call(3);
       },
       child: Container(
       padding: const EdgeInsets.all(16),
@@ -566,7 +572,7 @@ class _DashboardTabState extends State<DashboardTab> {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: const Color(0xFF9C89FF).withOpacity(0.2),
+                             color: themeService.selectedPalette.secondary.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Center(

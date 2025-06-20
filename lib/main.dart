@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +11,7 @@ import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/permissions_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/profile_edit_screen.dart';
 import 'services/theme_service.dart';
 import 'services/data_service.dart';
 import 'services/notification_service.dart';
@@ -63,7 +65,9 @@ void main() async {
   // Initialize notification service with error handling
   final notificationService = NotificationService();
   try {
-  await notificationService.initialize();
+    await notificationService.initialize();
+    // Reschedule all existing reminders after initialization
+    await notificationService.rescheduleAllReminders();
   } catch (e) {
     debugPrint('⚠️ Error initializing notification service: $e');
     // Continue app execution despite notification service error
@@ -84,6 +88,11 @@ void main() async {
   // Initialize UserModel
   final userModel = UserModel();
   await userModel.initialize();
+  
+  // Set up synchronization between DataService and UserModel
+  dataService.setUserUpdateCallback((updatedUser) {
+    userModel.syncWith(updatedUser);
+  });
   
   // Initialize SkeletonService for global skeleton loading
   final skeletonService = SkeletonService();
@@ -164,47 +173,49 @@ GoRouter createGoRouter(NavigationStateService navigationStateService) {
     initialLocation: '/', // Start at the logical root
     debugLogDiagnostics: true, // Enable console logging for router actions
     refreshListenable: navigationStateService, // Re-evaluate redirects when nav state changes
-    redirect: (BuildContext context, GoRouterState state) {
+    redirect: (BuildContext context, GoRouterState state) async {
       final String location = state.matchedLocation;
       
       // Wait for initialization if not ready yet
       if (!navigationStateService.isInitialized) {
-        // This should ideally be handled by a loading screen before router is active,
-        // but as a fallback, prevent redirection until initialized.
         debugPrint('Router Redirect: Waiting for NavigationStateService init...');
-        return null; // Or potentially redirect to a loading route if you have one
+        return null;
       }
 
       final bool onboardingCompleted = navigationStateService.onboardingCompleted;
       final bool permissionsGranted = navigationStateService.permissionsGranted;
 
       debugPrint('Router Redirect: Current=$location, Onboarding=$onboardingCompleted, Permissions=$permissionsGranted');
+      
+      // Additional debugging for DataService state
+      final dataService = Provider.of<DataService>(context, listen: false);
+      final hasUser = dataService.hasUser();
+      final currentUser = dataService.getCurrentUser();
+      debugPrint('Router Redirect: HasUser=$hasUser, UserName=${currentUser?.name}');
 
-      // Redirect logic:
-    if (!onboardingCompleted) {
+      // Redirect logic for first-time users
+      if (!onboardingCompleted) {
         // If onboarding isn't done, must go to onboarding screen
         if (location != '/onboarding') {
           debugPrint('Router Redirect: To /onboarding (not completed)');
           return '/onboarding';
         }
-    } else if (!permissionsGranted) {
+      } else if (!permissionsGranted) {
         // If onboarding is done but permissions aren't, must go to permissions screen
         if (location != '/permissions' && location != '/onboarding') {
-           // Allow staying on onboarding if somehow navigated back
           debugPrint('Router Redirect: To /permissions (not granted)');
           return '/permissions';
         }
-    } else {
+      } else {
         // If both onboarding and permissions are done, prevent access to those screens
         if (location == '/onboarding' || location == '/permissions') {
           debugPrint('Router Redirect: To / (already completed onboarding/permissions)');
-          return '/'; 
+          return '/';
         }
       }
-      
+
       // No redirect needed
-      debugPrint('Router Redirect: No redirect needed for $location');
-      return null; 
+      return null;
     },
     routes: [
       GoRoute(
@@ -221,9 +232,13 @@ GoRouter createGoRouter(NavigationStateService navigationStateService) {
         // Add nested routes if MainLayout uses a ShellRoute or similar
         // For simple cases, separate routes might be fine
       ),
-       GoRoute(
+      GoRoute(
         path: '/settings', // Example: Assuming settings is pushed on top
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/profile-edit',
+        builder: (context, state) => const ProfileEditScreen(),
       ),
       // Add other top-level routes here if needed
     ],
@@ -235,7 +250,7 @@ GoRouter createGoRouter(NavigationStateService navigationStateService) {
       );
     },
   );
-  }
+}
 
 // Modify MyApp to accept the router
 class MyApp extends StatelessWidget {
@@ -254,7 +269,8 @@ class MyApp extends StatelessWidget {
               key: const ValueKey('app-root'),
               title: 'Lilas Kokoro',
               debugShowCheckedModeBanner: false,
-              theme: theme, 
+              theme: themeService.lightTheme,
+              darkTheme: themeService.darkTheme,
               themeMode: themeService.isDarkMode ? ThemeMode.dark : ThemeMode.light,
               
               // Pass the router configuration
@@ -281,6 +297,7 @@ class MyApp extends StatelessWidget {
 }
 
 // Custom widget to handle theme animations
+/// Custom widget to handle theme animations
 class AnimatedThemeBuilder extends StatefulWidget {
   final ThemeService themeService;
   final Widget Function(BuildContext, ThemeData) builder;

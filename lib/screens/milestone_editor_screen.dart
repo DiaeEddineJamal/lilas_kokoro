@@ -4,6 +4,8 @@ import 'package:uuid/uuid.dart';
 import '../models/love_counter_model.dart';
 import '../models/milestone_model.dart';
 import '../services/data_service.dart';
+import '../widgets/gradient_app_bar.dart';
+import '../services/theme_service.dart';
 
 class MilestoneEditorScreen extends StatefulWidget {
   final LoveCounter loveCounter;
@@ -117,17 +119,20 @@ class _MilestoneEditorScreenState extends State<MilestoneEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeService = Provider.of<ThemeService>(context);
+    final isDarkMode = themeService.isDarkMode;
+    final theme = Theme.of(context);
+    final backgroundColor = theme.scaffoldBackgroundColor;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.existingMilestone == null ? 'Add Milestone' : 'Edit Milestone',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
+      backgroundColor: backgroundColor,
+      appBar: GradientAppBar(
+        title: widget.existingMilestone == null ? '🏆 Add Milestone' : '✏️ Edit Milestone',
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
         ),
-        backgroundColor: const Color(0xFFFF85A2),
-        foregroundColor: Colors.white,
-        elevation: 0,
+        automaticallyImplyLeading: false,
       ),
       body: Form(
         key: _formKey,
@@ -138,9 +143,11 @@ class _MilestoneEditorScreenState extends State<MilestoneEditorScreen> {
             children: [
               Card(
                 elevation: 2,
+                margin: const EdgeInsets.only(bottom: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
+                color: isDarkMode ? const Color(0xFF383844) : Colors.white,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -151,21 +158,32 @@ class _MilestoneEditorScreenState extends State<MilestoneEditorScreen> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black87,
                         ),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _titleController,
+                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87),
                         decoration: InputDecoration(
                           labelText: 'Title',
+                          labelStyle: TextStyle(
+                            color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
+                          ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFFF85A2),
+                            borderSide: BorderSide(
+                              color: themeService.primary,
                               width: 2,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
                             ),
                           ),
                         ),
@@ -179,16 +197,26 @@ class _MilestoneEditorScreenState extends State<MilestoneEditorScreen> {
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _descriptionController,
-                        decoration: InputDecoration(
-                          labelText: 'Description',
-                          border: OutlineInputBorder(
+                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87),
+                                decoration: InputDecoration(
+          labelText: 'Description',
+          labelStyle: TextStyle(
+            color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: themeService.primary,
+              width: 2,
+            ),
+          ),
+                          enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFFF85A2),
-                              width: 2,
+                            borderSide: BorderSide(
+                              color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
                             ),
                           ),
                         ),
@@ -197,24 +225,33 @@ class _MilestoneEditorScreenState extends State<MilestoneEditorScreen> {
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _dayCountController,
-                        decoration: InputDecoration(
-                          labelText: 'Day Count',
-                          border: OutlineInputBorder(
+                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87),
+                                decoration: InputDecoration(
+          labelText: 'Day Count',
+          labelStyle: TextStyle(
+            color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: themeService.primary,
+              width: 2,
+            ),
+          ),
+                          enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFFF85A2),
-                              width: 2,
+                            borderSide: BorderSide(
+                              color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
                             ),
                           ),
-                          helperText: 'Number of days from your anniversary',
                         ),
                         keyboardType: TextInputType.number,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter day count';
+                            return 'Please enter a day count';
                           }
                           if (int.tryParse(value) == null) {
                             return 'Please enter a valid number';
@@ -227,13 +264,13 @@ class _MilestoneEditorScreenState extends State<MilestoneEditorScreen> {
                 ),
               ),
               
-              const SizedBox(height: 16),
-              
               Card(
                 elevation: 2,
+                margin: const EdgeInsets.only(bottom: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
+                color: isDarkMode ? const Color(0xFF383844) : Colors.white,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -244,79 +281,54 @@ class _MilestoneEditorScreenState extends State<MilestoneEditorScreen> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black87,
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // For the emoji selector
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: _emojis.map((emoji) {
-                          return Material(
-                            color: Colors.transparent,
-                            shape: const CircleBorder(),
-                            child: InkWell(
-                              customBorder: const CircleBorder(),
-                              onTap: () {
-                                setState(() {
-                                  _selectedEmoji = emoji;
-                                });
-                              },
-                              child: Container(
-                                width: 50,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  color: _selectedEmoji == emoji
-                                      ? const Color(0xFFFF85A2).withOpacity(0.2)
-                                      : Colors.transparent,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
+                      SizedBox(
+                        width: double.infinity,
+                        child: Wrap(
+                          alignment: WrapAlignment.spaceEvenly,
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: _emojis.map((emoji) {
+                            return Material(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () {
+                                  setState(() {
+                                    _selectedEmoji = emoji;
+                                  });
+                                },
+                                child: Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: BoxDecoration(
                                     color: _selectedEmoji == emoji
-                                        ? const Color(0xFFFF85A2)
-                                        : Colors.grey.shade300,
-                                    width: 2,
+                                        ? themeService.primary.withOpacity(0.2)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: _selectedEmoji == emoji
+                                          ? themeService.primary
+                                          : Colors.grey.shade300,
+                                      width: 2,
+                                    ),
                                   ),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    emoji,
-                                    style: const TextStyle(fontSize: 24),
+                                  child: Center(
+                                    child: Text(
+                                      emoji,
+                                      style: const TextStyle(fontSize: 24),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      
-                      const SizedBox(height: 24),
-                      
-                      // For the save button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: Material(
-                          color: const Color(0xFFFF85A2),
-                          borderRadius: BorderRadius.circular(16),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: _isSaving ? null : _saveMilestone,
-                            child: Center(
-                              child: _isSaving
-                                  ? const CircularProgressIndicator(color: Colors.white)
-                                  : Text(
-                                      'Save Milestone',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                            ),
-                          ),
+                            );
+                          }).toList(),
                         ),
-                      )
+                      ),
                     ],
                   ),
                 ),
@@ -327,26 +339,28 @@ class _MilestoneEditorScreenState extends State<MilestoneEditorScreen> {
               SizedBox(
                 width: double.infinity,
                 height: 50,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _saveMilestone,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF85A2),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                child: Material(
+                  color: themeService.primary,
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: _isSaving ? null : _saveMilestone,
+                    child: Center(
+                      child: _isSaving
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : Text(
+                              'Save Milestone',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
-                  child: _isSaving
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : Text(
-                          'Save Milestone',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
                 ),
               ),
+              const SizedBox(height: 16),
             ],
           ),
         ),

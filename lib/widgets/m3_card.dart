@@ -26,7 +26,7 @@ class M3Card extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = color ?? (isDark ? colorScheme.surface : Colors.white);
+    final cardColor = color ?? (isDark ? const Color(0xFF383844) : Colors.white);
     final customRadius = borderRadius ?? BorderRadius.circular(20);
     final customElevation = elevation ?? (isDark ? 4.0 : 3.0);
     
@@ -112,7 +112,7 @@ class M3SettingCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final cardRadius = borderRadius ?? 16.0;
-    final cardColor = backgroundColor ?? (isDark ? colorScheme.surface : Colors.white);
+    final cardColor = backgroundColor ?? (isDark ? const Color(0xFF383844) : Colors.white);
     
     return Container(
       margin: const EdgeInsets.only(bottom: 12.0),

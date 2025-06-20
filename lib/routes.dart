@@ -6,6 +6,7 @@ import 'screens/ai_companion_screen.dart';
 import 'screens/reminders_screen.dart';
 import 'screens/love_counter_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/profile_edit_screen.dart';
 import 'widgets/main_layout.dart';
 
 // Define route paths as constants
@@ -18,6 +19,7 @@ class Routes {
   static const String reminders = '/reminders';
   static const String loveCounter = '/love-counter';
   static const String settings = '/settings';
+  static const String profileEdit = '/profile-edit';
 }
 
 /// Custom page route with beautiful transitions
@@ -120,7 +122,7 @@ class AppRoutes {
 
       case Routes.dashboard:
         return SmoothPageRoute(
-          page: const MainLayout(initialIndex: 0),
+          page: const MainLayout(),
           transitionType: TransitionType.rightToLeft,
           settings: settings,
         );
@@ -149,7 +151,14 @@ class AppRoutes {
 
       case Routes.settings:
         return SmoothPageRoute(
-          page: const MainLayout(initialIndex: 4),
+          page: const MainLayout(),
+          transitionType: TransitionType.rightToLeft,
+          settings: settings,
+        );
+
+      case Routes.profileEdit:
+        return SmoothPageRoute(
+          page: const ProfileEditScreen(),
           transitionType: TransitionType.rightToLeft,
           settings: settings,
         );

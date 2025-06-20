@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'tooltip_wrapper.dart';
+import 'package:provider/provider.dart';
+import '../services/theme_service.dart';
 
 enum M3ButtonType {
   primary,
@@ -49,6 +51,7 @@ class M3Button extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final themeService = Provider.of<ThemeService>(context, listen: false);
     
     // Determine button style based on type
     Widget button;
@@ -98,10 +101,7 @@ class M3Button extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              baseColor,
-              Color.lerp(baseColor, isDark ? Colors.black : Colors.white, 0.2)!,
-            ],
+            colors: isDark ? themeService.darkGradient : themeService.lightGradient,
           ),
           boxShadow: [
             BoxShadow(
