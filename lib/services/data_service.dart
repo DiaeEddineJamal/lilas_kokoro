@@ -165,6 +165,8 @@ class DataService extends ChangeNotifier {
   // Save user
   Future<void> saveUser(UserModel user) async {
     final bool isFirstTimeUser = _currentUser == null;
+    final bool hasChanged = _currentUser?.toMap().toString() != user.toMap().toString();
+    
     _currentUser = user;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_userKey, json.encode(user.toMap()));
@@ -174,11 +176,14 @@ class DataService extends ChangeNotifier {
       await _initializeDefaultDataForUser(user);
     }
     
-    notifyListeners();
-    
-    // Notify UserModel provider of the update
-    if (_userUpdateCallback != null) {
-      _userUpdateCallback!(user);
+    // Only notify listeners if data actually changed
+    if (hasChanged) {
+      notifyListeners();
+      
+      // Notify UserModel provider of the update
+      if (_userUpdateCallback != null) {
+        _userUpdateCallback!(user);
+      }
     }
   }
   

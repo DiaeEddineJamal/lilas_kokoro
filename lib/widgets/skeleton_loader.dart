@@ -29,7 +29,7 @@ class SkeletonLoader extends StatefulWidget {
     this.customEffect,
     this.containerColor,
     this.enableAnimation = true,
-    this.transitionDuration = const Duration(milliseconds: 300),
+    this.transitionDuration = const Duration(milliseconds: 200),
     this.enableGlossyEffect = false,
     this.ignoreQuickToggles = true,
     this.excludedTypes = const <Type>[],
@@ -45,26 +45,25 @@ class _SkeletonLoaderState extends State<SkeletonLoader> {
     final themeService = Provider.of<ThemeService>(context);
     final skeletonService = Provider.of<SkeletonService>(context);
     final isDarkMode = themeService.isDarkMode;
-    final colorScheme = Theme.of(context).colorScheme;
     
     // Use the provided isLoading value or fall back to the global service
     final shouldShowSkeleton = widget.isLoading ?? (skeletonService.isLoading && !skeletonService.isQuickToggle);
     
-    // Simplify shimmer effect for better performance
+    // Optimized shimmer effect for better performance
     final shimmerEffect = widget.customEffect ?? ShimmerEffect(
       baseColor: isDarkMode 
-          ? const Color(0xFF232330)
-          : Colors.grey[200]!,
-      highlightColor: isDarkMode 
           ? const Color(0xFF2A2A38)
-          : Colors.grey[50]!,
-      duration: const Duration(milliseconds: 1400), // Faster animation
+          : Colors.grey[300]!,
+      highlightColor: isDarkMode 
+          ? const Color(0xFF343444)
+          : Colors.grey[100]!,
+      duration: const Duration(milliseconds: 1200), // Faster for better performance
     );
     
     // Simpler background color for containers
     final bgColor = widget.containerColor ?? (isDarkMode 
-        ? const Color(0xFF282834)
-        : Colors.grey.shade50);
+        ? const Color(0xFF2A2A38)
+        : Colors.grey.shade100);
     
     final configData = SkeletonizerConfigData(
       effect: shimmerEffect,
@@ -72,13 +71,6 @@ class _SkeletonLoaderState extends State<SkeletonLoader> {
       ignoreContainers: false,
       justifyMultiLineText: true,
     );
-    
-    // Simplified glossy effect (or none if disabled)
-    Widget applyGlossyEffect(Widget content) {
-      if (!widget.enableGlossyEffect) return content;
-      
-      return content; // Simply return content without effects for better performance
-    }
     
     // Wrapper to handle animations when switching between loading and content state
     Widget buildSkeletonContent(Widget content) {
@@ -90,42 +82,17 @@ class _SkeletonLoaderState extends State<SkeletonLoader> {
         ),
       );
       
-      // Add a smooth transition between skeleton and content if animations are enabled
+      // Simplified animation for better performance
       if (widget.enableAnimation) {
         return AnimatedSwitcher(
           duration: widget.transitionDuration,
-          switchInCurve: Curves.easeOutQuart,
-          switchOutCurve: Curves.easeInQuart,
-          transitionBuilder: (Widget child, Animation<double> animation) {
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0.0, 0.03),
-                  end: Offset.zero,
-                ).animate(animation),
-                child: child,
-              ),
-            );
-          },
-          layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
-            return Stack(
-              alignment: Alignment.center,
-              children: <Widget>[
-                ...previousChildren,
-                if (currentChild != null) currentChild,
-              ],
-            );
-          },
-          child: shouldShowSkeleton
-              ? applyGlossyEffect(skeletonContent)
-              : content,
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child: shouldShowSkeleton ? skeletonContent : content,
         );
       }
       
-      return shouldShowSkeleton
-          ? applyGlossyEffect(skeletonContent)
-          : content;
+      return shouldShowSkeleton ? skeletonContent : content;
     }
     
     // Handle header widgets specially
@@ -170,8 +137,8 @@ class SkeletonLoaderFixed extends StatelessWidget {
     this.customEffect,
     this.containerColor,
     this.enableAnimation = true,
-    this.transitionDuration = const Duration(milliseconds: 300),
-    this.enableGlossyEffect = true,
+    this.transitionDuration = const Duration(milliseconds: 200),
+    this.enableGlossyEffect = false,
     this.excludedTypes = const <Type>[],
   }) : super(key: key);
 
@@ -180,34 +147,24 @@ class SkeletonLoaderFixed extends StatelessWidget {
     final themeService = Provider.of<ThemeService>(context);
     final skeletonService = Provider.of<SkeletonService>(context);
     final isDarkMode = themeService.isDarkMode;
-    final colorScheme = Theme.of(context).colorScheme;
     
     final shouldShowSkeleton = isLoading ?? skeletonService.isLoading;
     
-    // Create rich primary color variations for more realistic shimmer
-    final primaryColor = colorScheme.primary;
-    final primaryLight = HSLColor.fromColor(primaryColor).withLightness(
-      isDarkMode ? 0.25 : 0.92
-    ).toColor();
-    final primaryLighter = HSLColor.fromColor(primaryColor).withLightness(
-      isDarkMode ? 0.35 : 0.97
-    ).toColor();
-    
-    // Enhanced shimmer effect based on the app's theme
+    // Simplified shimmer effect for better performance
     final shimmerEffect = customEffect ?? ShimmerEffect(
       baseColor: isDarkMode 
-          ? Color.alphaBlend(primaryColor.withOpacity(0.08), const Color(0xFF232330)) 
-          : Color.alphaBlend(primaryColor.withOpacity(0.05), Colors.grey[200]!),
+          ? const Color(0xFF2A2A38)
+          : Colors.grey[300]!,
       highlightColor: isDarkMode 
-          ? Color.alphaBlend(primaryColor.withOpacity(0.15), const Color(0xFF2A2A38)) 
-          : Color.alphaBlend(primaryColor.withOpacity(0.1), Colors.grey[50]!),
-      duration: const Duration(milliseconds: 1600),
+          ? const Color(0xFF343444)
+          : Colors.grey[100]!,
+      duration: const Duration(milliseconds: 1200),
     );
     
-    // Custom background color for containers
+    // Simpler background color
     final bgColor = containerColor ?? (isDarkMode 
-        ? Color.alphaBlend(primaryColor.withOpacity(0.06), const Color(0xFF282834)) 
-        : Color.alphaBlend(primaryColor.withOpacity(0.03), Colors.grey.shade50));
+        ? const Color(0xFF2A2A38)
+        : Colors.grey.shade100);
     
     final configData = SkeletonizerConfigData(
       effect: shimmerEffect,
@@ -216,92 +173,38 @@ class SkeletonLoaderFixed extends StatelessWidget {
       justifyMultiLineText: true,
     );
     
-    // Create glossy effect for skeleton components
-    Widget applyGlossyEffect(Widget content) {
-      if (!enableGlossyEffect) return content;
-      
-      return Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: isDarkMode 
-              ? [
-                  BoxShadow(
-                    color: primaryColor.withOpacity(0.05),
-                    blurRadius: 10,
-                    spreadRadius: -2,
-                  )
-                ]
-              : [
-                  BoxShadow(
-                    color: Colors.white.withOpacity(0.8),
-                    blurRadius: 10,
-                    spreadRadius: -2,
-                    offset: const Offset(-2, -2),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    spreadRadius: -2,
-                    offset: const Offset(2, 2),
-                  ),
-                ],
-        ),
-        child: content,
-      );
-    }
-    
-    // Wrapper to handle animations when switching between loading and content state
-    Widget buildSkeletonContent(Widget content) {
+    Widget buildContent() {
       final skeletonContent = SkeletonizerConfig(
         data: configData,
         child: Skeletonizer(
           enabled: shouldShowSkeleton,
-          child: content,
+          child: child,
         ),
       );
       
-      // Add a smooth transition between skeleton and content if animations are enabled
+      // Simplified animation
       if (enableAnimation) {
         return AnimatedSwitcher(
           duration: transitionDuration,
-          switchInCurve: Curves.easeOutQuart,
-          switchOutCurve: Curves.easeInQuart,
-          transitionBuilder: (Widget child, Animation<double> animation) {
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0.0, 0.03),
-                  end: Offset.zero,
-                ).animate(animation),
-                child: child,
-              ),
-            );
-          },
-          child: shouldShowSkeleton
-              ? applyGlossyEffect(skeletonContent)
-              : content,
+          child: shouldShowSkeleton ? skeletonContent : child,
         );
       }
       
-      return shouldShowSkeleton
-          ? applyGlossyEffect(skeletonContent)
-          : content;
+      return shouldShowSkeleton ? skeletonContent : child;
     }
     
+    // Handle header widgets
     if (headerWidgets != null && headerWidgets!.isNotEmpty) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ...headerWidgets!,
-          
-          // The difference is here - we don't use Expanded
-          buildSkeletonContent(child),
+          Expanded(child: buildContent()),
         ],
       );
     }
-
-    return buildSkeletonContent(child);
+    
+    return buildContent();
   }
 }
 

@@ -25,47 +25,63 @@ class RemindersScreen extends StatefulWidget {
   State<RemindersScreen> createState() => _RemindersScreenState();
 }
 
-class _RemindersScreenState extends State<RemindersScreen> {
+class _RemindersScreenState extends State<RemindersScreen> with AutomaticKeepAliveClientMixin {
   List<Reminder>? _cachedReminders;
   late DataService _dataService;
+  bool _isInitialLoad = true;
+  bool _hasLoadedOnce = false;
+  
+  // Keep alive to prevent rebuilds when switching tabs
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
     _dataService = Provider.of<DataService>(context, listen: false);
-    _loadReminders();
-    // Listen for data refresh events
-    _dataService.addListener(_onDataRefresh);
+    _loadRemindersQuietly();
   }
 
   @override
   void dispose() {
-    // Remove listener to prevent memory leaks using stored instance
-    _dataService.removeListener(_onDataRefresh);
     super.dispose();
   }
 
-  Future<void> _loadReminders() async {
+  /// Load reminders without showing skeleton - for initial loads and background updates
+  Future<void> _loadRemindersQuietly() async {
+    if (!mounted) return;
+    
+    try {
+      final reminders = await _dataService.getReminders();
+      if (mounted) {
+        setState(() {
+          _cachedReminders = reminders;
+          _hasLoadedOnce = true;
+          _isInitialLoad = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading reminders: $e');
+      if (mounted) {
+        setState(() {
+          _hasLoadedOnce = true;
+          _isInitialLoad = false;
+        });
+      }
+    }
+  }
+
+  /// Load reminders with skeleton - only for explicit user-triggered refreshes
+  Future<void> _loadRemindersWithSkeleton() async {
     final skeletonService = Provider.of<SkeletonService>(context, listen: false);
     
-    await skeletonService.withQuickToggle(() async {
-      // Simulate loading time for smooth UX
-      await Future.delayed(const Duration(milliseconds: 800));
+    await skeletonService.withLoading(() async {
+      await _loadRemindersQuietly();
     });
   }
 
   Future<void> _onRefresh() async {
-    await _loadReminders();
-    if (mounted) {
-      setState(() {}); // Trigger rebuild to refresh data
-    }
-  }
-
-  void _onDataRefresh() {
-    // Trigger skeleton loader only on data refresh
-    final skeletonService = Provider.of<SkeletonService>(context, listen: false);
-    skeletonService.showLoader();
-    _loadReminders();
+    await _loadRemindersWithSkeleton();
   }
 
   void _toggleReminderCompletionOptimistic(Reminder reminder, DataService dataService) async {
@@ -105,86 +121,39 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     final themeService = Provider.of<ThemeService>(context);
     final isDarkMode = themeService.isDarkMode;
     final dataService = Provider.of<DataService>(context);
     final skeletonService = Provider.of<SkeletonService>(context);
 
+    // Only show skeleton on initial load or explicit loading
+    final shouldShowSkeleton = _isInitialLoad || skeletonService.isLoading;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SkeletonLoaderFixed(
-        isLoading: skeletonService.isLoading,
+        isLoading: shouldShowSkeleton,
         child: RefreshIndicator(
           onRefresh: _onRefresh,
           color: themeService.primary,
-          child: FutureBuilder<List<Reminder>>(
-            future: dataService.getReminders(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting && !skeletonService.isLoading) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              final reminders = snapshot.data ?? [];
-              
-              if (reminders.isEmpty) {
-                return ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    SizedBox(height: MediaQuery.of(context).size.height * 0.3),
-                    Center(
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.notifications_off_rounded,
-                            size: 80,
-                            color: Colors.grey.shade400,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No reminders yet',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Pull down to refresh or tap the + button to create your first reminder',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: isDarkMode ? Colors.white54 : Colors.grey.shade500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              }
-
-              return ListView.builder(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                itemCount: reminders.length,
-                itemBuilder: (context, index) {
-                  final reminder = reminders[index];
-                  return _buildReminderCard(reminder, isDarkMode, dataService, themeService);
-                },
-              );
-            },
-          ),
+          child: _buildContent(isDarkMode, dataService, themeService),
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => const ReminderEditorScreen(),
             ),
           );
+          
+          // Refresh data quietly if a reminder was added/edited
+          if (result == true) {
+            _loadRemindersQuietly();
+          }
         },
         backgroundColor: themeService.primary,
         elevation: 4,
@@ -200,6 +169,64 @@ class _RemindersScreenState extends State<RemindersScreen> {
           size: 24,
         ),
       ),
+    );
+  }
+  
+  Widget _buildContent(bool isDarkMode, DataService dataService, ThemeService themeService) {
+    // Use cached data if available, otherwise show appropriate state
+    final reminders = _cachedReminders ?? [];
+    
+    if (!_hasLoadedOnce && _isInitialLoad) {
+      // Still loading initial data
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (reminders.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+          Center(
+            child: Column(
+              children: [
+                Icon(
+                  Icons.notifications_off_rounded,
+                  size: 80,
+                  color: Colors.grey.shade400,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No reminders yet',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Pull down to refresh or tap the + button to create your first reminder',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: isDarkMode ? Colors.white54 : Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(16),
+      itemCount: reminders.length,
+      itemBuilder: (context, index) {
+        final reminder = reminders[index];
+        return _buildReminderCard(reminder, isDarkMode, dataService, themeService);
+      },
     );
   }
 

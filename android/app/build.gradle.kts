@@ -18,8 +18,12 @@ android {
     }
 
     buildTypes {
-        release {
+        getByName("release") {
             signingConfig = signingConfigs.getByName("debug")
+            // Disable resource shrinking to prevent icon removal
+            isMinifyEnabled = false
+            isShrinkResources = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 

@@ -193,6 +193,15 @@ GoRouter createGoRouter(NavigationStateService navigationStateService) {
       final currentUser = dataService.getCurrentUser();
       debugPrint('Router Redirect: HasUser=$hasUser, UserName=${currentUser?.name}');
 
+      // Reset skeleton service on route changes to prevent stuck loading states
+      context.read<SkeletonService>().reset();
+      
+      // Check if user exists, if not redirect to onboarding
+      final userModel = context.read<UserModel>();
+      if (userModel.id.isEmpty) {
+        return '/onboarding';
+      }
+
       // Redirect logic for first-time users
       if (!onboardingCompleted) {
         // If onboarding isn't done, must go to onboarding screen

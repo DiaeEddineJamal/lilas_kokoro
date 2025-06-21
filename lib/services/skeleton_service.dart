@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 
 /// A service that manages the global skeleton loading state across the app.
 /// This ensures consistent loading behavior and prevents unnecessary
@@ -9,6 +10,12 @@ class SkeletonService extends ChangeNotifier {
   bool _isRefreshing = false;
   bool _isQuickToggle = false;
   bool _isEnabled = false;
+  bool _disposed = false;
+  DateTime? _lastLoadingTime;
+  Timer? _debounceTimer;
+  
+  // Debounce mechanism to prevent rapid loading state changes
+  static const Duration _debounceThreshold = Duration(milliseconds: 100);
   
   /// Gets the current loading state
   bool get isLoading => _isLoading;
@@ -22,7 +29,7 @@ class SkeletonService extends ChangeNotifier {
   /// Gets whether the skeleton UI is enabled
   Future<bool> get isEnabled async {
     final prefs = await SharedPreferences.getInstance();
-    _isEnabled = prefs.getBool('skeleton_enabled') ?? false;
+    _isEnabled = prefs.getBool('skeleton_enabled') ?? true; // Default to enabled
     return _isEnabled;
   }
   
@@ -34,14 +41,34 @@ class SkeletonService extends ChangeNotifier {
     notifyListeners();
   }
   
-  /// Sets the loading state and notifies listeners
+  /// Sets the loading state with debouncing to prevent flickering
   set isLoading(bool value) {
+    if (_disposed) return;
+    
+    final now = DateTime.now();
+    
+    // Debounce rapid state changes
+    if (_lastLoadingTime != null && 
+        now.difference(_lastLoadingTime!) < _debounceThreshold &&
+        _isLoading == value) {
+      return;
+    }
+    
     if (_isLoading != value) {
       _isLoading = value;
+      _lastLoadingTime = now;
+      
       if (value == false) {
         _isQuickToggle = false; // Reset quick toggle state when loading ends
       }
-      notifyListeners();
+      
+      // Debounce notifications to prevent excessive rebuilds
+      _debounceTimer?.cancel();
+      _debounceTimer = Timer(const Duration(milliseconds: 16), () {
+        if (!_disposed) {
+          notifyListeners();
+        }
+      });
     }
   }
   
@@ -61,16 +88,14 @@ class SkeletonService extends ChangeNotifier {
     }
   }
   
-  /// Shows the skeleton loader
+  /// Shows the skeleton loader with debouncing
   void showLoader() {
-    _isLoading = true;
-    notifyListeners();
+    isLoading = true;
   }
   
   /// Hides the skeleton loader
   void hideLoader() {
-    _isLoading = false;
-    notifyListeners();
+    isLoading = false;
   }
   
   /// Shows the refresh loader
@@ -96,23 +121,33 @@ class SkeletonService extends ChangeNotifier {
   Future<T> withQuickToggle<T>(Future<T> Function() operation) async {
     try {
       _isQuickToggle = true;
-      showLoader();
       return await operation();
     } finally {
-      hideLoader();
+      _isQuickToggle = false;
     }
   }
   
   /// Executes an async operation with automatic skeleton loading
-  /// 
-  /// Shows the skeleton loader before the operation starts and
-  /// hides it when the operation completes (whether successfully or with an error)
-  Future<T> withLoading<T>(Future<T> Function() operation) async {
+  /// Only shows skeleton for operations that take longer than threshold
+  Future<T> withLoading<T>(Future<T> Function() operation, {
+    Duration minimumLoadingTime = const Duration(milliseconds: 200),
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    
     try {
       showLoader();
-      return await operation();
+      final result = await operation();
+      
+      // Ensure minimum loading time to prevent flickering
+      final elapsed = stopwatch.elapsed;
+      if (elapsed < minimumLoadingTime) {
+        await Future.delayed(minimumLoadingTime - elapsed);
+      }
+      
+      return result;
     } finally {
       hideLoader();
+      stopwatch.stop();
     }
   }
 
@@ -124,5 +159,30 @@ class SkeletonService extends ChangeNotifier {
     } finally {
       hideRefresh();
     }
+  }
+  
+  /// Reset all loading states - useful for navigation or app state changes
+  void reset() {
+    if (_disposed) return;
+    
+    _debounceTimer?.cancel();
+    _isLoading = false;
+    _isRefreshing = false;
+    _isQuickToggle = false;
+    _lastLoadingTime = null;
+    
+    // Use Future.microtask to avoid calling notifyListeners during a build
+    Future.microtask(() {
+      if (!_disposed) {
+        notifyListeners();
+      }
+    });
+  }
+  
+  @override
+  void dispose() {
+    _disposed = true;
+    _debounceTimer?.cancel();
+    super.dispose();
   }
 }

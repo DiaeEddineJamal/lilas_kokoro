@@ -18,6 +18,36 @@ import 'dart:io';
 import 'sound_manager.dart';
 import 'audio_service.dart';
 
+// This needs to be a top-level function or a static method to be accessible from the background.
+@pragma('vm:entry-point')
+void notificationTapBackground(NotificationResponse notificationResponse) {
+  // This function is called when the app is in the background or terminated.
+  debugPrint('🔔 Background notification tapped: ${notificationResponse.payload}');
+  debugPrint('🔔 Action ID: ${notificationResponse.actionId}');
+  
+  try {
+    // Handle notification actions in background
+    if (notificationResponse.payload != null && notificationResponse.payload!.isNotEmpty) {
+      if (notificationResponse.actionId == 'mark_complete' && notificationResponse.payload!.startsWith('reminder:')) {
+        final parts = notificationResponse.payload!.split(':');
+        if (parts.length >= 2) {
+          final reminderId = parts[1];
+          NotificationService._markReminderCompleteStatic(reminderId);
+        }
+      } 
+      else if (notificationResponse.actionId == 'snooze_reminder' && notificationResponse.payload!.startsWith('reminder:')) {
+        final parts = notificationResponse.payload!.split(':');
+        if (parts.length >= 2) {
+          final reminderId = parts[1];
+          NotificationService._snoozeReminderStatic(reminderId);
+        }
+      }
+    }
+  } catch (e) {
+    debugPrint('❌ Error in background notification handler: $e');
+  }
+}
+
 class NotificationService extends ChangeNotifier {
   static final NotificationService _instance = NotificationService._internal();
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
@@ -120,7 +150,7 @@ class NotificationService extends ChangeNotifier {
       
       // Initialize notification plugin with custom app icon
       const AndroidInitializationSettings androidInitializationSettings =
-          AndroidInitializationSettings('@drawable/ic_notification');
+          AndroidInitializationSettings('ic_notification');
       
       const DarwinInitializationSettings iosInitializationSettings =
           DarwinInitializationSettings(
@@ -137,6 +167,7 @@ class NotificationService extends ChangeNotifier {
       final bool? initialized = await _flutterLocalNotificationsPlugin.initialize(
         initializationSettings,
         onDidReceiveNotificationResponse: onNotificationResponse,
+        onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
       ).catchError((error) {
         debugPrint('❌ Error initializing notification plugin: $error');
         return false;
@@ -144,38 +175,90 @@ class NotificationService extends ChangeNotifier {
       
       debugPrint('🔔 Notification plugin initialized: $initialized');
       
-      // Create notification channels for Android with error handling
+      // Create notification channels for Android with enhanced configuration
       try {
         final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
             _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin>();
                 
         if (androidPlugin != null) {
-          // Create simple notification channel
+          // Create high importance notification channel for reminders
           const AndroidNotificationChannel reminderChannel = AndroidNotificationChannel(
             'reminder_channel',
             'Reminders',
-            description: 'Critical reminders',
-            importance: Importance.high,
+            description: 'Important reminders and notifications',
+            importance: Importance.max, // Changed to max for heads-up notifications
             enableVibration: true,
             enableLights: true,
             playSound: true,
             showBadge: true,
+            ledColor: Color(0xFFFF69B4), // Pink LED color
           );
+          
+          // Create test notification channel
+          const AndroidNotificationChannel testChannel = AndroidNotificationChannel(
+            'test_channel',
+            'Test Notifications',
+            description: 'Test notifications for debugging',
+            importance: Importance.max,
+            enableVibration: true,
+            enableLights: true,
+            playSound: true,
+            showBadge: true,
+            ledColor: Color(0xFFFF69B4),
+          );
+          
+          // Create completion feedback channel
+          const AndroidNotificationChannel completionChannel = AndroidNotificationChannel(
+            'completion_channel',
+            'Task Completions',
+            description: 'Confirmations when tasks are completed',
+            importance: Importance.low,
+            enableVibration: false,
+            enableLights: false,
+            playSound: false,
+            showBadge: false,
+          );
+          
+          // Create snooze feedback channel
+          const AndroidNotificationChannel snoozeFeedbackChannel = AndroidNotificationChannel(
+            'snooze_feedback_channel',
+            'Snooze Confirmations',
+            description: 'Confirmations when reminders are snoozed',
+            importance: Importance.low,
+            enableVibration: false,
+            enableLights: false,
+            playSound: false,
+            showBadge: false,
+          );
+          
           await androidPlugin.createNotificationChannel(reminderChannel);
-          debugPrint('🔔 Android notification channel created');
+          await androidPlugin.createNotificationChannel(testChannel);
+          await androidPlugin.createNotificationChannel(completionChannel);
+          await androidPlugin.createNotificationChannel(snoozeFeedbackChannel);
+          debugPrint('🔔 Android notification channels created');
+          
+          // Check if notifications are enabled
+          final bool? areEnabled = await androidPlugin.areNotificationsEnabled();
+          debugPrint('🔔 Notifications enabled: $areEnabled');
+          
+          if (areEnabled == false) {
+            debugPrint('⚠️ Notifications are disabled in system settings');
+          }
         }
       } catch (e) {
         debugPrint('⚠️ Error creating notification channel: $e');
       }
       
-      // Request permissions with error handling
+      // Request permissions with enhanced handling
       try {
         final bool permissionGranted = await requestPermissions();
         debugPrint('🔔 Notification permissions granted: $permissionGranted');
         
         if (!permissionGranted) {
           debugPrint('⚠️ Notification permissions not granted - notifications may not work');
+          // Request battery optimization exemption
+          await requestBatteryOptimizationExemption();
         }
       } catch (e) {
         debugPrint('⚠️ Error requesting permissions: $e');
@@ -183,9 +266,26 @@ class NotificationService extends ChangeNotifier {
       
       debugPrint('✅ NotificationService initialized successfully');
       
+      // Log detailed notification status for debugging
+      _logNotificationStatus();
+      
     } catch (e) {
       debugPrint('❌ Critical error in NotificationService initialization: $e');
       // Don't rethrow - allow app to continue without notifications
+    }
+  }
+  
+  // Add debug logging method
+  Future<void> _logNotificationStatus() async {
+    try {
+      debugPrint('📊 === NOTIFICATION STATUS DEBUG ===');
+      final status = await getDetailedNotificationStatus();
+      status.forEach((key, value) {
+        debugPrint('📊 $key: $value');
+      });
+      debugPrint('📊 === END NOTIFICATION STATUS ===');
+    } catch (e) {
+      debugPrint('❌ Error logging notification status: $e');
     }
   }
   
@@ -305,63 +405,16 @@ class NotificationService extends ChangeNotifier {
     }
   }
   
-  // Add this method to mark a reminder as complete
+  // Enhanced method to mark a reminder as complete with visual feedback
   Future<void> _markReminderComplete(String reminderId) async {
-    try {
-      final dataService = DataService();
-      final reminders = await dataService.getReminders();
-      final reminderIndex = reminders.indexWhere((r) => r.id == reminderId);
-      
-      if (reminderIndex >= 0) {
-        final reminder = reminders[reminderIndex];
-        final updatedReminder = reminder.copyWith(isCompleted: true);
-        await dataService.updateReminder(updatedReminder);
-      
-        // Cancel the notification
-        final notificationId = reminderId.hashCode.abs() % 100000;
-      await cancelNotification(notificationId);
-      
-        debugPrint('✅ Marked reminder complete: $reminderId');
-      }
-    } catch (e) {
-      debugPrint('❌ Error marking reminder complete: $e');
-    }
+    // Call the static method to ensure consistency
+    await _markReminderCompleteStatic(reminderId);
   }
   
-  // Add this method to snooze a reminder
+  // Enhanced method to snooze a reminder with better scheduling
   Future<void> _snoozeReminder(String reminderId) async {
-    try {
-      final dataService = DataService();
-      final reminders = await dataService.getReminders();
-      final reminder = reminders.firstWhere(
-        (r) => r.id == reminderId,
-        orElse: () => null as Reminder,
-      );
-      
-      if (reminder != null) {
-        // Cancel the current notification
-        final notificationId = reminderId.hashCode.abs() % 100000;
-        await cancelNotification(notificationId);
-        
-        // Schedule a new notification for 5 minutes later
-        final snoozeTime = DateTime.now().add(const Duration(minutes: 5));
-        
-        // For snoozed reminders, we want to show them even if today isn't in the repeat days
-        // So create a direct notification rather than using scheduleReminderNotification
-        await scheduleNotification(
-          title: '⏰ ${reminder.title} (Snoozed)',
-          body: '⏰ Snoozed reminder!\nWill remind again at ${DateFormat('HH:mm').format(snoozeTime)}',
-          id: notificationId,
-          scheduledTime: snoozeTime,
-          payload: 'reminder:${reminder.id}',
-          isSnoozeReminder: true,
-        );
-        
-        debugPrint('✅ Reminder snoozed for 5 minutes: $reminderId');
-      }
-    } catch (e) {
-      debugPrint('❌ Error snoozing reminder: $e');
-    }
+    // Call the static method to ensure consistency
+    await _snoozeReminderStatic(reminderId);
   }
 
   // Show a simple notification
@@ -441,8 +494,6 @@ class NotificationService extends ChangeNotifier {
       tzDateTime,
       notificationDetails,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      // Only use matchDateTimeComponents for regular reminders, not for snoozed ones
-      matchDateTimeComponents: isSnoozeReminder ? null : DateTimeComponents.dateAndTime,
       payload: payload,
     );
     
@@ -493,6 +544,7 @@ class NotificationService extends ChangeNotifier {
         channelDescription: 'Critical reminders that must be delivered',
         importance: Importance.max,
         priority: Priority.max,
+        icon: 'ic_notification',
         sound: notificationSound,
         playSound: _soundEnabled,
         enableVibration: vibrate && _vibrationEnabled,
@@ -502,12 +554,15 @@ class NotificationService extends ChangeNotifier {
         category: AndroidNotificationCategory.reminder,
         visibility: NotificationVisibility.public,
         channelAction: AndroidNotificationChannelAction.createIfNotExists,
-        audioAttributesUsage: AudioAttributesUsage.notification,
-        // Remove potentially problematic properties that might cause crashes
+        // Remove potentially problematic audio attributes
+        showWhen: true,
+        when: DateTime.now().millisecondsSinceEpoch,
         enableLights: true,
         ledColor: const Color(0xFFFF69B4),
         ledOnMs: 1000,
         ledOffMs: 500,
+        // Add ticker for better visibility
+        ticker: 'New reminder from Lilas Kokoro',
       );
     } catch (e) {
       debugPrint('❌ Error creating Android notification details: $e');
@@ -517,12 +572,14 @@ class NotificationService extends ChangeNotifier {
         'Reminders',
         channelDescription: 'Critical reminders',
         importance: Importance.max,
-        priority: Priority.high,
+        priority: Priority.max,
         playSound: true,
         enableVibration: true,
         autoCancel: true,
         category: AndroidNotificationCategory.reminder,
         visibility: NotificationVisibility.public,
+        showWhen: true,
+        ticker: 'Lilas Kokoro reminder',
       );
     }
   }
@@ -711,7 +768,7 @@ class NotificationService extends ChangeNotifier {
       // Convert to timezone
       final tzScheduleTime = tz.TZDateTime.from(scheduleTime, tz.local);
       
-      // Schedule with minimal configuration to prevent crashes
+      // Schedule with enhanced configuration for better visibility
       await _flutterLocalNotificationsPlugin.zonedSchedule(
         notificationId,
         title,
@@ -721,12 +778,30 @@ class NotificationService extends ChangeNotifier {
           android: AndroidNotificationDetails(
             'reminder_channel',
             'Reminders',
-            channelDescription: 'Reminder notifications',
-            importance: Importance.high,
-            priority: Priority.high,
+            channelDescription: 'Important reminders and notifications',
+            importance: Importance.max,
+            priority: Priority.max,
             autoCancel: false,
-            icon: '@drawable/ic_notification', // Use optimized notification icon
-            largeIcon: DrawableResourceAndroidBitmap('@mipmap/launcher_icon'), // Use full-color app icon
+            icon: 'ic_notification',
+            showWhen: true,
+            enableVibration: true,
+            playSound: true,
+            ongoing: false,
+            fullScreenIntent: true, // Helps show heads-up notifications
+            actions: <AndroidNotificationAction>[
+              AndroidNotificationAction(
+                'mark_complete',
+                '✅ Complete',
+                icon: DrawableResourceAndroidBitmap('ic_check_complete'),
+                showsUserInterface: false,
+              ),
+              AndroidNotificationAction(
+                'snooze_reminder',
+                '⏰ Snooze +5min',
+                icon: DrawableResourceAndroidBitmap('ic_snooze'),
+                showsUserInterface: false,
+              ),
+            ],
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -888,67 +963,425 @@ class NotificationService extends ChangeNotifier {
     }
   }
 
-  // Simple and safe notification test
-  Future<void> runNotificationDiagnostic() async {
+  // Comprehensive notification diagnostic and guidance
+  Future<Map<String, dynamic>> runNotificationDiagnostic() async {
     if (kIsWeb) {
-      debugPrint('🌐 Running on web - notifications not supported');
-      return;
+      return {
+        'success': false,
+        'message': 'Notifications are not supported on web platforms',
+        'details': []
+      };
     }
     
-    debugPrint('🔍 === SIMPLE NOTIFICATION TEST START ===');
+    debugPrint('🔍 === COMPREHENSIVE NOTIFICATION DIAGNOSTIC START ===');
+    
+    final List<String> issues = [];
+    final List<String> suggestions = [];
+    bool canSendNotifications = true;
     
     try {
-      // Test 1: Simple immediate notification
-      debugPrint('📱 Testing immediate notification...');
-      await _flutterLocalNotificationsPlugin.show(
-        12345,
-        'Test Notification',
-        'This is a test notification from Lilas Kokoro!',
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'reminder_channel',
-            'Reminders',
-            channelDescription: 'Test notifications',
-            importance: Importance.high,
-            priority: Priority.high,
-            icon: '@drawable/ic_notification', // Use optimized notification icon
-            largeIcon: DrawableResourceAndroidBitmap('@mipmap/launcher_icon'), // Use full-color app icon
+      // Check 1: Plugin initialization
+      debugPrint('1️⃣ Checking plugin initialization...');
+      
+      // Check 2: Android-specific checks
+      final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+          _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      
+      if (androidPlugin != null) {
+        // Check notifications enabled
+        final bool? areEnabled = await androidPlugin.areNotificationsEnabled();
+        debugPrint('2️⃣ System notifications enabled: $areEnabled');
+        
+        if (areEnabled == false) {
+          issues.add('Notifications are disabled in system settings');
+          suggestions.add('Go to Settings > Apps > Lilas Kokoro > Notifications and enable them');
+          canSendNotifications = false;
+        }
+        
+        // Check exact alarm permission (Android 12+)
+        try {
+          final bool? canScheduleExact = await androidPlugin.canScheduleExactNotifications();
+          debugPrint('3️⃣ Can schedule exact alarms: $canScheduleExact');
+          
+          if (canScheduleExact == false) {
+            issues.add('Exact alarm scheduling is disabled');
+            suggestions.add('Go to Settings > Apps > Special app access > Alarms & reminders > Lilas Kokoro and enable it');
+          }
+        } catch (e) {
+          debugPrint('⚠️ Exact alarm check not available: $e');
+        }
+      }
+      
+      // Check 3: App-level notification settings
+      debugPrint('4️⃣ App notification settings enabled: $_notificationsEnabled');
+      if (!_notificationsEnabled) {
+        issues.add('Notifications are disabled in app settings');
+        suggestions.add('Enable notifications in the app permissions screen');
+        canSendNotifications = false;
+      }
+      
+      // Check 4: Try sending a test notification
+      if (canSendNotifications) {
+        debugPrint('5️⃣ Attempting to send test notification...');
+        
+        await _flutterLocalNotificationsPlugin.show(
+          99999,
+          '✅ Notification Test',
+          'If you can see this, notifications are working correctly!',
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'test_channel',
+              'Test Notifications',
+              channelDescription: 'Test notifications for debugging',
+              importance: Importance.max,
+              priority: Priority.max,
+              icon: 'ic_notification',
+              showWhen: true,
+              enableVibration: true,
+              playSound: true,
+              autoCancel: true,
+              ongoing: false,
+              ticker: 'Test notification from Lilas Kokoro',
+              visibility: NotificationVisibility.public,
+              category: AndroidNotificationCategory.reminder,
+            ),
           ),
-        ),
-      );
-      debugPrint('✅ Immediate notification sent');
-      
-      // Test 2: Simple scheduled notification (5 seconds)
-      debugPrint('⏰ Testing scheduled notification (5 seconds)...');
-      final testTime = DateTime.now().add(const Duration(seconds: 5));
-      final tzTestTime = tz.TZDateTime.from(testTime, tz.local);
-      
-      await _flutterLocalNotificationsPlugin.zonedSchedule(
-        12346,
-        'Scheduled Test',
-        'This scheduled notification shows background notifications work!',
-        tzTestTime,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'reminder_channel',
-            'Reminders',
-            channelDescription: 'Test scheduled notifications',
-            importance: Importance.high,
-            priority: Priority.high,
-            icon: '@drawable/ic_notification', // Use optimized notification icon
-            largeIcon: DrawableResourceAndroidBitmap('@mipmap/launcher_icon'), // Use full-color app icon
+        );
+        
+        debugPrint('✅ Test notification sent successfully');
+        
+        // Schedule a follow-up notification
+        final testTime = DateTime.now().add(const Duration(seconds: 5));
+        final tzTestTime = tz.TZDateTime.from(testTime, tz.local);
+        
+        await _flutterLocalNotificationsPlugin.zonedSchedule(
+          99998,
+          '⏰ Scheduled Test',
+          'This proves scheduled notifications work too!',
+          tzTestTime,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'test_channel',
+              'Test Notifications',
+              channelDescription: 'Test scheduled notifications',
+              importance: Importance.max,
+              priority: Priority.max,
+              icon: 'ic_notification',
+              showWhen: true,
+              enableVibration: true,
+              playSound: true,
+              autoCancel: true,
+              ongoing: false,
+              ticker: 'Scheduled test from Lilas Kokoro',
+              visibility: NotificationVisibility.public,
+              category: AndroidNotificationCategory.reminder,
+            ),
           ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      );
-      debugPrint('✅ Scheduled notification set for: $testTime');
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        );
+        
+        debugPrint('✅ Scheduled test notification set for: $testTime');
+      }
       
-      debugPrint('🔍 === NOTIFICATION TEST COMPLETE ===');
-      debugPrint('📱 You should see an immediate notification now and another in 5 seconds!');
+      debugPrint('🔍 === NOTIFICATION DIAGNOSTIC COMPLETE ===');
+      
+      final String resultMessage = issues.isEmpty 
+          ? 'Notifications are working correctly! You should see test notifications now.'
+          : 'Found ${issues.length} issue(s) that may prevent notifications from working.';
+      
+      return {
+        'success': issues.isEmpty,
+        'message': resultMessage,
+        'issues': issues,
+        'suggestions': suggestions,
+        'details': [
+          'System notifications enabled: ${androidPlugin != null ? await androidPlugin.areNotificationsEnabled() : 'Unknown'}',
+          'App notifications enabled: $_notificationsEnabled',
+          'Test notifications sent: ${canSendNotifications ? 'Yes' : 'No'}',
+        ]
+      };
       
     } catch (e) {
-      debugPrint('❌ Notification test failed: $e');
-      rethrow; // Let the UI handle the error
+      debugPrint('❌ Notification diagnostic failed: $e');
+      return {
+        'success': false,
+        'message': 'Notification diagnostic failed: $e',
+        'issues': ['Diagnostic error: $e'],
+        'suggestions': ['Please try restarting the app and checking system notification settings'],
+        'details': []
+      };
+    }
+  }
+
+  // Add a simple test notification method for immediate testing
+  Future<void> showTestNotification() async {
+    if (kIsWeb) return;
+    
+    try {
+      debugPrint('🧪 Sending immediate test notification...');
+      
+      // Test 1: Using the custom icon
+      await _flutterLocalNotificationsPlugin.show(
+        12345,
+        '🧪 Test 1: Custom Icon',
+        'This notification uses your app\'s icon.',
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'test_channel',
+            'Test Notifications',
+            channelDescription: 'Immediate test notifications',
+            importance: Importance.max,
+            priority: Priority.max,
+            icon: 'ic_notification', // Your custom icon
+            ticker: 'Immediate test notification',
+          ),
+        ),
+      );
+
+      // Test 2: Using a standard system icon as a fallback
+      await _flutterLocalNotificationsPlugin.show(
+        12346,
+        '🧪 Test 2: System Icon',
+        'This notification uses a standard system icon.',
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'test_channel',
+            'Test Notifications',
+            channelDescription: 'Immediate test notifications with system icon',
+            importance: Importance.max,
+            priority: Priority.max,
+            icon: '@android:drawable/ic_dialog_info', // A standard Android resource
+            ticker: 'Immediate system icon test',
+          ),
+        ),
+      );
+      
+      debugPrint('✅ Immediate test notifications sent');
+      
+      // Also send a scheduled one for a few seconds later
+      final scheduledTime = DateTime.now().add(const Duration(seconds: 10));
+      await scheduleNotification(
+        title: '⏰ Scheduled Test',
+        body: 'This scheduled notification should appear in 10 seconds!',
+        id: 12347,
+        scheduledTime: scheduledTime,
+        payload: 'test:scheduled',
+      );
+      
+      debugPrint('✅ Scheduled test notification for 10 seconds from now');
+      
+    } catch (e) {
+      debugPrint('❌ Error sending test notification: $e');
+      rethrow;
+    }
+  }
+
+  // Add a method to check notification settings in detail
+  Future<Map<String, dynamic>> getDetailedNotificationStatus() async {
+    if (kIsWeb) {
+      return {'supported': false, 'reason': 'Web platform not supported'};
+    }
+    
+    final Map<String, dynamic> status = {};
+    
+    try {
+      final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+          _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      
+      if (androidPlugin != null) {
+        // Check basic notification permission
+        final bool? areEnabled = await androidPlugin.areNotificationsEnabled();
+        status['notifications_enabled'] = areEnabled;
+        
+        // Check exact alarm permission
+        try {
+          final bool? canScheduleExact = await androidPlugin.canScheduleExactNotifications();
+          status['can_schedule_exact'] = canScheduleExact;
+        } catch (e) {
+          status['can_schedule_exact'] = 'error: $e';
+        }
+        
+        // Check app settings
+        status['app_notifications_enabled'] = _notificationsEnabled;
+        status['app_sound_enabled'] = _soundEnabled;
+        status['app_vibration_enabled'] = _vibrationEnabled;
+        
+        // Try to get active notifications
+        try {
+          final List<ActiveNotification> activeNotifications = 
+              await androidPlugin.getActiveNotifications();
+          status['active_notifications_count'] = activeNotifications.length;
+          status['active_notification_ids'] = activeNotifications.map((n) => n.id).toList();
+        } catch (e) {
+          status['active_notifications_error'] = e.toString();
+        }
+        
+        // Try to get pending notifications
+        try {
+          final List<PendingNotificationRequest> pendingNotifications = 
+              await _flutterLocalNotificationsPlugin.pendingNotificationRequests();
+          status['pending_notifications_count'] = pendingNotifications.length;
+          status['pending_notification_ids'] = pendingNotifications.map((n) => n.id).toList();
+        } catch (e) {
+          status['pending_notifications_error'] = e.toString();
+        }
+      }
+      
+      return status;
+    } catch (e) {
+      return {'error': e.toString()};
+    }
+  }
+
+  // Static method to mark a reminder as complete (for background processing)
+  static Future<void> _markReminderCompleteStatic(String reminderId) async {
+    try {
+      debugPrint('🔔 Static: Marking reminder complete: $reminderId');
+      
+      final dataService = DataService();
+      final reminders = await dataService.getReminders();
+      final reminderIndex = reminders.indexWhere((r) => r.id == reminderId);
+      
+      if (reminderIndex >= 0) {
+        final reminder = reminders[reminderIndex];
+        final updatedReminder = reminder.copyWith(isCompleted: true);
+        await dataService.updateReminder(updatedReminder);
+      
+        // Cancel the original notification
+        final notificationId = reminderId.hashCode.abs() % 100000;
+        final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+        await flutterLocalNotificationsPlugin.cancel(notificationId);
+        
+        // Show completion confirmation
+        await flutterLocalNotificationsPlugin.show(
+          99990 + notificationId,
+          '✅ Task Completed!',
+          '${reminder.title} has been marked as complete',
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'completion_channel',
+              'Task Completions',
+              channelDescription: 'Confirmations when tasks are completed',
+              importance: Importance.low,
+              priority: Priority.low,
+              icon: 'ic_check_complete',
+              autoCancel: true,
+              ongoing: false,
+              showWhen: true,
+              enableVibration: false,
+              playSound: false,
+              ticker: 'Task completed',
+              visibility: NotificationVisibility.public,
+              category: AndroidNotificationCategory.status,
+            ),
+          ),
+        );
+        
+        debugPrint('✅ Static: Marked reminder complete: $reminderId');
+      }
+    } catch (e) {
+      debugPrint('❌ Static: Error marking reminder complete: $e');
+    }
+  }
+  
+  // Static method to snooze a reminder (for background processing)
+  static Future<void> _snoozeReminderStatic(String reminderId) async {
+    try {
+      debugPrint('🔔 Static: Snoozing reminder: $reminderId');
+      
+      final dataService = DataService();
+      final reminders = await dataService.getReminders();
+      final reminder = reminders.firstWhere(
+        (r) => r.id == reminderId,
+        orElse: () => null as Reminder,
+      );
+      
+      if (reminder != null) {
+        final notificationId = reminderId.hashCode.abs() % 100000;
+        final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+        
+        // Cancel the current notification
+        await flutterLocalNotificationsPlugin.cancel(notificationId);
+        
+        // Calculate snooze time
+        final originalTime = reminder.dateTime;
+        final now = DateTime.now();
+        final baseTime = originalTime.isBefore(now) ? now : originalTime;
+        final snoozeTime = baseTime.add(const Duration(minutes: 5));
+        
+        // Schedule the snoozed notification
+        await flutterLocalNotificationsPlugin.zonedSchedule(
+          notificationId,
+          '⏰ ${reminder.title} (Snoozed)',
+          'Snoozed for 5 minutes • Will remind again at ${DateFormat('HH:mm').format(snoozeTime)}',
+          tz.TZDateTime.from(snoozeTime, tz.local),
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              'reminder_channel',
+              'Reminders',
+              channelDescription: 'Snoozed reminders',
+              importance: Importance.max,
+              priority: Priority.max,
+              icon: 'ic_notification',
+              showWhen: true,
+              enableVibration: true,
+              playSound: true,
+              autoCancel: false,
+              ongoing: false,
+              ticker: 'Snoozed reminder from Lilas Kokoro',
+              visibility: NotificationVisibility.public,
+              category: AndroidNotificationCategory.reminder,
+              actions: <AndroidNotificationAction>[
+                AndroidNotificationAction(
+                  'mark_complete',
+                  '✅ Complete',
+                  icon: DrawableResourceAndroidBitmap('ic_check_complete'),
+                  showsUserInterface: false,
+                ),
+                AndroidNotificationAction(
+                  'snooze_reminder',
+                  '⏰ Snooze +5min',
+                  icon: DrawableResourceAndroidBitmap('ic_snooze'),
+                  showsUserInterface: false,
+                ),
+              ],
+            ),
+          ),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          payload: 'reminder:${reminder.id}',
+        );
+        
+        // Show snooze feedback
+        await flutterLocalNotificationsPlugin.show(
+          99980 + notificationId,
+          '⏰ Reminder Snoozed',
+          'Will remind you again at ${DateFormat('HH:mm').format(snoozeTime)}',
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'snooze_feedback_channel',
+              'Snooze Confirmations',
+              channelDescription: 'Confirmations when reminders are snoozed',
+              importance: Importance.low,
+              priority: Priority.low,
+              icon: 'ic_snooze',
+              autoCancel: true,
+              ongoing: false,
+              showWhen: true,
+              enableVibration: false,
+              playSound: false,
+              ticker: 'Reminder snoozed',
+              visibility: NotificationVisibility.public,
+              category: AndroidNotificationCategory.status,
+            ),
+          ),
+        );
+        
+        debugPrint('✅ Static: Reminder snoozed for 5 minutes: $reminderId');
+      }
+    } catch (e) {
+      debugPrint('❌ Static: Error snoozing reminder: $e');
     }
   }
 }

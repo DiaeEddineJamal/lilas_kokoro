@@ -128,26 +128,67 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
     try {
       final notificationService = Provider.of<NotificationService>(context, listen: false);
       
-      // Run comprehensive notification diagnostic
-      await notificationService.runNotificationDiagnostic();
+      // First try the simple immediate test
+      await notificationService.showTestNotification();
       
-      // Show success dialog
+      // Then run the comprehensive diagnostic
+      final diagnosticResult = await notificationService.runNotificationDiagnostic();
+      
+      // Show result dialog based on diagnostic
       if (mounted) {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
             title: Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.green),
+                Icon(
+                  diagnosticResult['success'] ? Icons.check_circle : Icons.warning,
+                  color: diagnosticResult['success'] ? Colors.green : Colors.orange,
+                ),
                 const SizedBox(width: 8),
-                Text("Test Sent!"),
+                Text(diagnosticResult['success'] ? "Tests Sent!" : "Issues Found"),
               ],
             ),
-            content: Text(
-              "Test notifications have been sent:\n"
-              "• Immediate notification (should appear now)\n"
-              "• Scheduled notification (in 10 seconds)\n\n"
-              "If you don't see them, check your notification settings or try closing the app completely and wait for the scheduled one.",
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(diagnosticResult['message'] ?? 'Unknown result'),
+                  if (diagnosticResult['issues'] != null && diagnosticResult['issues'].isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text('Issues found:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ...diagnosticResult['issues'].map<Widget>((issue) => 
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8, top: 4),
+                        child: Text('• $issue'),
+                      )
+                    ),
+                  ],
+                  if (diagnosticResult['suggestions'] != null && diagnosticResult['suggestions'].isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text('Suggested fixes:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ...diagnosticResult['suggestions'].map<Widget>((suggestion) => 
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8, top: 4),
+                        child: Text('• $suggestion'),
+                      )
+                    ),
+                  ],
+                  if (diagnosticResult['success']) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'You should see multiple test notifications:\n'
+                      '• Immediate test notification (now)\n'
+                      '• Another immediate test (now)\n'
+                      '• Scheduled test (in 5 seconds)\n'
+                      '• Another scheduled test (in 10 seconds)\n\n'
+                      'If you don\'t see them, check the suggestions above or your device\'s Do Not Disturb settings.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -171,7 +212,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                 Text("Test Failed"),
               ],
             ),
-            content: Text("Failed to send test notifications: $e"),
+            content: Text("Failed to run notification tests: $e"),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),

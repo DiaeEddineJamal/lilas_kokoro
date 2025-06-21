@@ -27,16 +27,20 @@ class DashboardTab extends StatefulWidget {
   State<DashboardTab> createState() => _DashboardTabState();
 }
 
-class _DashboardTabState extends State<DashboardTab> {
+class _DashboardTabState extends State<DashboardTab> with AutomaticKeepAliveClientMixin {
   // Store DataService instance
   late DataService _dataService;
   late AICompanionService _aiService;
   
-  // Cache data to prevent flickering
+  // Cache data to prevent flickering with better state management
   List<dynamic>? _cachedReminders;
   List<ChatConversation>? _cachedConversations;
-  bool _isLoadingReminders = false;
-  bool _isLoadingConversations = false;
+  bool _isInitialLoad = true;
+  bool _hasLoadedOnce = false;
+  
+  // Keep alive to prevent rebuilds when switching tabs
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -44,33 +48,19 @@ class _DashboardTabState extends State<DashboardTab> {
     // Get DataService instance here
     _dataService = Provider.of<DataService>(context, listen: false);
     _aiService = Provider.of<AICompanionService>(context, listen: false);
-    _loadData();
-    // Listen for data refresh events
-    _dataService.addListener(_onDataRefresh);
+    
+    // Load data immediately without skeleton for initial load
+    _loadDataQuietly();
   }
 
   @override
   void dispose() {
-    // Remove listener using the stored instance
-    _dataService.removeListener(_onDataRefresh);
     super.dispose();
   }
 
-  void _onDataRefresh() {
-    // Trigger skeleton loader only on data refresh
-    final skeletonService = Provider.of<SkeletonService>(context, listen: false);
-    skeletonService.showLoader();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    final skeletonService = Provider.of<SkeletonService>(context, listen: false);
-    
-    // Load reminders and conversations in parallel
-    setState(() {
-      _isLoadingReminders = true;
-      _isLoadingConversations = true;
-    });
+  /// Load data without showing skeleton - for initial loads and background updates
+  Future<void> _loadDataQuietly() async {
+    if (!mounted) return;
     
     try {
       final results = await Future.wait([
@@ -82,45 +72,50 @@ class _DashboardTabState extends State<DashboardTab> {
         setState(() {
           _cachedReminders = results[0] as List<dynamic>?;
           _cachedConversations = results[1] as List<ChatConversation>?;
-          _isLoadingReminders = false;
-          _isLoadingConversations = false;
+          _hasLoadedOnce = true;
+          _isInitialLoad = false;
         });
       }
     } catch (e) {
+      debugPrint('Error loading dashboard data: $e');
       if (mounted) {
         setState(() {
-          _isLoadingReminders = false;
-          _isLoadingConversations = false;
+          _hasLoadedOnce = true;
+          _isInitialLoad = false;
         });
       }
     }
+  }
+
+  /// Load data with skeleton - only for explicit user-triggered refreshes
+  Future<void> _loadDataWithSkeleton() async {
+    final skeletonService = Provider.of<SkeletonService>(context, listen: false);
     
-    // Simulate loading or fetch actual data
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (mounted) {
-      skeletonService.hideLoader();
-    }
+    await skeletonService.withLoading(() async {
+      await _loadDataQuietly();
+    });
   }
 
   Future<void> _onRefresh() async {
-    final skeletonService = Provider.of<SkeletonService>(context, listen: false);
-    skeletonService.showLoader();
-    await _loadData();
-    if (mounted) {
-      setState(() {}); // Trigger rebuild to refresh user data
-    }
+    // Use skeleton loading for pull-to-refresh
+    await _loadDataWithSkeleton();
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     final userId = Provider.of<UserModel>(context).id;
     final themeService = Provider.of<ThemeService>(context);
     final isDarkMode = themeService.isDarkMode;
     final userModel = Provider.of<UserModel>(context);
     final skeletonService = Provider.of<SkeletonService>(context);
 
+    // Only show skeleton on initial load or explicit loading
+    final shouldShowSkeleton = _isInitialLoad || skeletonService.isLoading;
+
     return SkeletonLoaderFixed(
-      isLoading: skeletonService.isLoading,
+      isLoading: shouldShowSkeleton,
       child: RefreshIndicator(
         onRefresh: _onRefresh,
         color: themeService.primary,
@@ -135,55 +130,59 @@ class _DashboardTabState extends State<DashboardTab> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Hello, ${userModel.name}! 👋',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: isDarkMode ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                        Text(
-                          'Welcome to your kawaii companion',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                          // Wrap CircleAvatar with GestureDetector for tap action
-                          GestureDetector(
-                            onTap: () async {
-                              // Navigate to ProfileEditScreen using consistent app navigation
-                              await context.push('/profile-edit');
-                              
-                              // Trigger a rebuild to refresh user data
-                              if (mounted) {
-                                setState(() {}); // Rebuild with latest user data
-                              }
-                            },
-                            child: CircleAvatar(
-                              backgroundColor: themeService.primary,
-                              radius: 24,
-                              backgroundImage: userModel.profileImagePath != null && userModel.profileImagePath!.isNotEmpty
-                                ? FileImage(File(userModel.profileImagePath!))
-                                : null,
-                              child: userModel.profileImagePath == null || userModel.profileImagePath!.isEmpty
-                                ? Text(
-                                    userModel.name.isNotEmpty ? userModel.name[0].toUpperCase() : 'G',
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : null,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Hello, ${userModel.name}! 👋',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: isDarkMode ? Colors.white : Colors.black87,
                             ),
                           ),
+                          Text(
+                            'Welcome to your kawaii companion',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Profile avatar with optimized image loading
+                    GestureDetector(
+                      onTap: () async {
+                        // Navigate to ProfileEditScreen using consistent app navigation
+                        await context.push('/profile-edit');
+                        
+                        // Refresh data quietly after profile update
+                        _loadDataQuietly();
+                      },
+                      child: CircleAvatar(
+                        backgroundColor: themeService.primary,
+                        radius: 24,
+                        backgroundImage: userModel.profileImagePath != null && 
+                                        userModel.profileImagePath!.isNotEmpty &&
+                                        File(userModel.profileImagePath!).existsSync()
+                          ? FileImage(File(userModel.profileImagePath!))
+                          : null,
+                        child: userModel.profileImagePath == null || 
+                               userModel.profileImagePath!.isEmpty ||
+                               !File(userModel.profileImagePath!).existsSync()
+                          ? Text(
+                              userModel.name.isNotEmpty ? userModel.name[0].toUpperCase() : 'G',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            )
+                          : null,
+                      ),
+                    ),
                   ],
                 ),
                 
@@ -397,10 +396,6 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   Widget _buildRemindersSection() {
-    if (_isLoadingReminders) {
-      return _buildSkeletonReminderCards();
-    }
-    
     if (_cachedReminders == null) {
       return _buildSkeletonReminderCards();
     }
@@ -518,10 +513,6 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   Widget _buildConversationsSection() {
-    if (_isLoadingConversations) {
-      return _buildSkeletonConversationCard();
-    }
-    
     if (_cachedConversations == null || _cachedConversations!.isEmpty) {
       return _buildEmptyState(
         context,

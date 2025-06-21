@@ -72,10 +72,15 @@ class _ReminderEditorScreenState extends State<ReminderEditorScreen> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
+    // Ensure initialDate is not before firstDate
+    final now = DateTime.now();
+    final firstDate = DateTime(now.year, now.month, now.day);
+    final initialDate = _selectedDate.isBefore(firstDate) ? firstDate : _selectedDate;
+    
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime.now(),
+      initialDate: initialDate,
+      firstDate: firstDate,
       lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
       builder: (BuildContext context, Widget? child) {
         return Theme(
@@ -167,7 +172,7 @@ class _ReminderEditorScreenState extends State<ReminderEditorScreen> {
       });
 
       if (mounted) {
-        Navigator.pop(context);
+        Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (mounted) {
