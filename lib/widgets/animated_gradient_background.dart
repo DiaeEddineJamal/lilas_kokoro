@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gen_art_bg/gen_art_bg.dart';
+import 'package:provider/provider.dart';
+import '../services/theme_service.dart';
 
 class AnimatedGradientBackground extends StatefulWidget {
   final Widget child;
@@ -18,27 +20,21 @@ class _AnimatedGradientBackgroundState extends State<AnimatedGradientBackground>
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final themeService = Provider.of<ThemeService>(context);
+    final isDarkMode = themeService.isDarkMode;
     
     return Container(
       width: double.infinity,
       height: double.infinity,
       decoration: BoxDecoration(
-        // Base gradient background
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        // Dynamic radial gradient background based on selected theme
+        gradient: RadialGradient(
+          center: const Alignment(-0.3, -0.5),
+          radius: 1.2,
           colors: isDarkMode 
-              ? [
-                  const Color(0xFF1a1a2e), // Deep dark blue
-                  const Color(0xFF16213e), // Dark navy
-                  const Color(0xFF0f3460), // Midnight blue
-                ]
-              : [
-                  const Color(0xFFffeef4), // Soft pink
-                  const Color(0xFFf8f4ff), // Light lavender
-                  const Color(0xFFf0f8ff), // Alice blue
-                ],
+              ? themeService.darkGradient
+              : themeService.lightGradient,
+          stops: const [0.0, 1.0],
         ),
       ),
       child: Stack(
@@ -78,16 +74,22 @@ class ChatAnimatedBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final themeService = Provider.of<ThemeService>(context);
+    final isDarkMode = themeService.isDarkMode;
     
     return Container(
       width: double.infinity,
       height: double.infinity,
       decoration: BoxDecoration(
-        // Base gradient background that adapts to theme
-        color: isDarkMode 
-            ? const Color(0xFF1a1a2e) // Deep dark blue for dark mode
-            : Colors.white, // Pure white for light mode
+        // Dynamic radial gradient background that adapts to selected theme
+        gradient: RadialGradient(
+          center: const Alignment(0.3, -0.7),
+          radius: 1.0,
+          colors: isDarkMode 
+              ? themeService.darkGradient
+              : themeService.lightGradient,
+          stops: const [0.0, 1.0],
+        ),
       ),
       child: isDarkMode 
         ? Container(

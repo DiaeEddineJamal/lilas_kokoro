@@ -320,12 +320,22 @@ class _DashboardTabState extends State<DashboardTab> with AutomaticKeepAliveClie
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              gradient: RadialGradient(
+                colors: isDarkMode ? themeService.darkGradient : themeService.lightGradient,
+                radius: 1.0,
+              ),
               borderRadius: BorderRadius.circular(15),
+              boxShadow: [
+                BoxShadow(
+                  color: themeService.primary.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: Icon(
               icon,
-              color: color,
+              color: Colors.white,
               size: 30,
             ),
           ),

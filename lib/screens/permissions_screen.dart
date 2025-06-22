@@ -471,8 +471,26 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                       child: Container(
                         width: double.infinity,
                         height: 50,
+                        decoration: BoxDecoration(
+                          gradient: _allPermissionsProcessed 
+                            ? LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: isDarkMode ? themeService.darkGradient : themeService.lightGradient,
+                              )
+                            : null,
+                          color: _allPermissionsProcessed ? null : Colors.grey.shade400,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: _allPermissionsProcessed ? [
+                            BoxShadow(
+                              color: themeService.primary.withOpacity(0.4),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ] : null,
+                        ),
                         child: Material(
-                          color: _allPermissionsProcessed ? themeService.primary : Colors.grey.shade400,
+                          color: Colors.transparent,
                           borderRadius: BorderRadius.circular(16),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(16),
@@ -481,12 +499,39 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                               showDialog(
                                 context: context,
                                 builder: (context) => AlertDialog(
-                                  title: Text("Permissions Required"),
-                                  content: Text("You need to grant all required permissions to continue using the app."),
+                                  backgroundColor: isDarkMode ? const Color(0xFF383844) : Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  title: Text(
+                                    "Permissions Required",
+                                    style: TextStyle(
+                                      color: isDarkMode ? Colors.white : Colors.black87,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  content: Text(
+                                    "You need to grant all required permissions to continue using the app.",
+                                    style: TextStyle(
+                                      color: isDarkMode ? Colors.white70 : Colors.black54,
+                                    ),
+                                  ),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.pop(context),
-                                      child: Text("OK"),
+                                      style: TextButton.styleFrom(
+                                        backgroundColor: primaryColor,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        "OK",
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),

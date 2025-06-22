@@ -65,7 +65,11 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating conversation: $e')),
+          SnackBar(
+            content: Text('Error creating conversation: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -78,7 +82,11 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting conversation: $e')),
+          SnackBar(
+            content: Text('Error deleting conversation: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -114,10 +122,32 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _createNewConversation,
-        backgroundColor: colorScheme.primary,
-        child: const Icon(Icons.add),
+      floatingActionButton: Consumer<ThemeService>(
+        builder: (context, themeService, child) {
+          final isDarkMode = themeService.isDarkMode;
+          return Container(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                colors: isDarkMode ? themeService.darkGradient : themeService.lightGradient,
+                radius: 1.0,
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: themeService.primary.withOpacity(0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: FloatingActionButton(
+              onPressed: _createNewConversation,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              child: const Icon(Icons.add, color: Colors.white),
+            ),
+          );
+        },
       ),
     );
   }
@@ -287,16 +317,48 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                   final confirmed = await showDialog<bool>(
                     context: context,
                     builder: (context) => AlertDialog(
-                      title: const Text('Delete Conversation'),
-                      content: const Text('Are you sure you want to delete this conversation?'),
+                      backgroundColor: isDarkMode ? const Color(0xFF383844) : Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      title: Text(
+                        'Delete Conversation',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black87,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      content: Text(
+                        'Are you sure you want to delete this conversation?',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white70 : Colors.black54,
+                        ),
+                      ),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                            ),
+                          ),
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Delete'),
+                          style: TextButton.styleFrom(
+                            backgroundColor: Colors.red.shade600,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            'Delete',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ],
                     ),

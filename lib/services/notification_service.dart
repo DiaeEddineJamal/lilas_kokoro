@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lilas_kokoro/models/reminder_model.dart';
 import 'package:lilas_kokoro/services/data_service.dart';
+import 'package:lilas_kokoro/services/navigation_state_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -17,6 +18,8 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'sound_manager.dart';
 import 'audio_service.dart';
+import 'dart:convert';
+import 'package:go_router/go_router.dart';
 
 // This needs to be a top-level function or a static method to be accessible from the background.
 @pragma('vm:entry-point')
@@ -26,25 +29,34 @@ void notificationTapBackground(NotificationResponse notificationResponse) {
   debugPrint('🔔 Action ID: ${notificationResponse.actionId}');
   
   try {
-    // Handle notification actions in background
-    if (notificationResponse.payload != null && notificationResponse.payload!.isNotEmpty) {
-      if (notificationResponse.actionId == 'mark_complete' && notificationResponse.payload!.startsWith('reminder:')) {
+    // Handle notification actions in background with enhanced error handling
+    if (notificationResponse.payload != null && 
+        notificationResponse.payload!.isNotEmpty &&
+        notificationResponse.payload!.startsWith('reminder:')) {
+      
         final parts = notificationResponse.payload!.split(':');
         if (parts.length >= 2) {
           final reminderId = parts[1];
-          NotificationService._markReminderCompleteStatic(reminderId);
+        
+        if (notificationResponse.actionId == 'mark_complete') {
+          NotificationService._markReminderCompleteNew(reminderId).catchError((error) {
+            debugPrint('❌ Background error marking reminder complete: $error');
+          });
+        } 
+        else if (notificationResponse.actionId == 'snooze_reminder') {
+          NotificationService._snoozeReminderNew(reminderId).catchError((error) {
+            debugPrint('❌ Background error snoozing reminder: $error');
+          });
         }
-      } 
-      else if (notificationResponse.actionId == 'snooze_reminder' && notificationResponse.payload!.startsWith('reminder:')) {
-        final parts = notificationResponse.payload!.split(':');
-        if (parts.length >= 2) {
-          final reminderId = parts[1];
-          NotificationService._snoozeReminderStatic(reminderId);
+        else {
+          // Regular notification tap - navigate to reminders
+          debugPrint('📱 Background notification tap - navigating to reminders');
         }
       }
     }
   } catch (e) {
-    debugPrint('❌ Error in background notification handler: $e');
+    debugPrint('❌ Critical error in background notification handler: $e');
+    // Don't rethrow - prevent app crashes
   }
 }
 
@@ -128,29 +140,42 @@ class NotificationService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Initialize notification service with crash prevention
+  // Initialize notification service with enhanced crash prevention
   Future<void> initialize() async {
     if (kIsWeb) return;
     
     try {
       debugPrint('🔔 Initializing NotificationService...');
       
-      // Initialize timezone with error handling
+      // Initialize timezone with comprehensive error handling
       try {
         tz_data.initializeTimeZones();
         final String timeZoneName = await FlutterTimezone.getLocalTimezone();
         tz.setLocalLocation(tz.getLocation(timeZoneName));
         debugPrint('🌍 Timezone set to: $timeZoneName');
       } catch (e) {
-        debugPrint('⚠️ Error setting timezone: $e - using default');
+        debugPrint('⚠️ Error setting timezone: $e - using UTC as fallback');
+        try {
+          tz.setLocalLocation(tz.getLocation('UTC'));
+        } catch (fallbackError) {
+          debugPrint('❌ Critical timezone error: $fallbackError');
+        }
       }
       
-      // Load preferences first
+      // Load preferences first with error handling
+      try {
       await _loadPreferences();
+      } catch (e) {
+        debugPrint('⚠️ Error loading preferences: $e - using defaults');
+        _soundEnabled = true;
+        _notificationsEnabled = true;
+        _vibrationEnabled = true;
+      }
       
-      // Initialize notification plugin with custom app icon
+      // Initialize notification plugin with enhanced error handling
+      try {
       const AndroidInitializationSettings androidInitializationSettings =
-          AndroidInitializationSettings('ic_notification');
+            AndroidInitializationSettings('@mipmap/launcher_icon');
       
       const DarwinInitializationSettings iosInitializationSettings =
           DarwinInitializationSettings(
@@ -168,35 +193,40 @@ class NotificationService extends ChangeNotifier {
         initializationSettings,
         onDidReceiveNotificationResponse: onNotificationResponse,
         onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
-      ).catchError((error) {
-        debugPrint('❌ Error initializing notification plugin: $error');
-        return false;
-      });
+        );
       
       debugPrint('🔔 Notification plugin initialized: $initialized');
       
-      // Create notification channels for Android with enhanced configuration
+        if (initialized != true) {
+          debugPrint('⚠️ Notification plugin initialization returned false');
+        }
+        
+      } catch (e) {
+        debugPrint('❌ Critical error initializing notification plugin: $e');
+        // Continue with reduced functionality
+      }
+      
+      // Create notification channels for Android with enhanced error handling
       try {
         final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
             _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin>();
                 
         if (androidPlugin != null) {
-          // Create high importance notification channel for reminders
-          const AndroidNotificationChannel reminderChannel = AndroidNotificationChannel(
+          // Create channels with safe configuration
+          const List<AndroidNotificationChannel> channels = [
+            AndroidNotificationChannel(
             'reminder_channel',
             'Reminders',
             description: 'Important reminders and notifications',
-            importance: Importance.max, // Changed to max for heads-up notifications
+              importance: Importance.max,
             enableVibration: true,
             enableLights: true,
             playSound: true,
             showBadge: true,
-            ledColor: Color(0xFFFF69B4), // Pink LED color
-          );
-          
-          // Create test notification channel
-          const AndroidNotificationChannel testChannel = AndroidNotificationChannel(
+              ledColor: Color(0xFFFF69B4),
+            ),
+            AndroidNotificationChannel(
             'test_channel',
             'Test Notifications',
             description: 'Test notifications for debugging',
@@ -206,10 +236,8 @@ class NotificationService extends ChangeNotifier {
             playSound: true,
             showBadge: true,
             ledColor: Color(0xFFFF69B4),
-          );
-          
-          // Create completion feedback channel
-          const AndroidNotificationChannel completionChannel = AndroidNotificationChannel(
+            ),
+            AndroidNotificationChannel(
             'completion_channel',
             'Task Completions',
             description: 'Confirmations when tasks are completed',
@@ -218,60 +246,35 @@ class NotificationService extends ChangeNotifier {
             enableLights: false,
             playSound: false,
             showBadge: false,
-          );
+            ),
+          ];
           
-          // Create snooze feedback channel
-          const AndroidNotificationChannel snoozeFeedbackChannel = AndroidNotificationChannel(
-            'snooze_feedback_channel',
-            'Snooze Confirmations',
-            description: 'Confirmations when reminders are snoozed',
-            importance: Importance.low,
-            enableVibration: false,
-            enableLights: false,
-            playSound: false,
-            showBadge: false,
-          );
-          
-          await androidPlugin.createNotificationChannel(reminderChannel);
-          await androidPlugin.createNotificationChannel(testChannel);
-          await androidPlugin.createNotificationChannel(completionChannel);
-          await androidPlugin.createNotificationChannel(snoozeFeedbackChannel);
-          debugPrint('🔔 Android notification channels created');
-          
-          // Check if notifications are enabled
-          final bool? areEnabled = await androidPlugin.areNotificationsEnabled();
-          debugPrint('🔔 Notifications enabled: $areEnabled');
-          
-          if (areEnabled == false) {
-            debugPrint('⚠️ Notifications are disabled in system settings');
+          // Create each channel with individual error handling
+          for (final channel in channels) {
+            try {
+              await androidPlugin.createNotificationChannel(channel);
+              debugPrint('✅ Created notification channel: ${channel.id}');
+      } catch (e) {
+              debugPrint('⚠️ Error creating channel ${channel.id}: $e');
+            }
           }
         }
       } catch (e) {
-        debugPrint('⚠️ Error creating notification channel: $e');
+        debugPrint('❌ Error creating notification channels: $e');
       }
       
-      // Request permissions with enhanced handling
-      try {
-        final bool permissionGranted = await requestPermissions();
-        debugPrint('🔔 Notification permissions granted: $permissionGranted');
-        
-        if (!permissionGranted) {
-          debugPrint('⚠️ Notification permissions not granted - notifications may not work');
-          // Request battery optimization exemption
-          await requestBatteryOptimizationExemption();
-        }
-      } catch (e) {
-        debugPrint('⚠️ Error requesting permissions: $e');
-      }
+      debugPrint('✅ NotificationService initialization completed');
       
-      debugPrint('✅ NotificationService initialized successfully');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Critical error during NotificationService initialization: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
       
-      // Log detailed notification status for debugging
-      _logNotificationStatus();
+      // Set safe defaults
+      _notificationsEnabled = false; // Disable notifications if initialization fails
+      _soundEnabled = true;
+      _vibrationEnabled = true;
       
-    } catch (e) {
-      debugPrint('❌ Critical error in NotificationService initialization: $e');
-      // Don't rethrow - allow app to continue without notifications
+      // Don't rethrow - allow app to continue with reduced functionality
     }
   }
   
@@ -364,57 +367,144 @@ class NotificationService extends ChangeNotifier {
     }
   }
   
-  // Handle notification response (including action buttons)
+  // Handle notification response (including action buttons) - Enhanced crash prevention
   void onNotificationResponse(NotificationResponse response) {
+    // Use the new static handler for better reliability
+    _onNotificationResponseNew(response).catchError((error) {
+      debugPrint('❌ Error in notification response handler: $error');
+    });
+  }
+  
+  // Handle notification tap to navigate to reminders screen
+  Future<void> _handleNotificationTap(String reminderId) async {
     try {
-      debugPrint('🔔 Notification response received: ${response.payload}');
+      debugPrint('📱 Handling notification tap for reminder: $reminderId');
       
-      // Handle notification tap
-      if (response.payload != null && response.payload!.isNotEmpty) {
-        debugPrint('📱 Processing notification payload: ${response.payload}');
-        
-        // Handle reminder actions with proper error handling
-        if (response.actionId == 'mark_complete' && response.payload!.startsWith('reminder:')) {
-          final parts = response.payload!.split(':');
-          if (parts.length >= 2) {
-            final reminderId = parts[1];
-            _markReminderComplete(reminderId).catchError((error) {
-              debugPrint('❌ Error marking reminder complete: $error');
-            });
-          }
-        } 
-        else if (response.actionId == 'snooze_reminder' && response.payload!.startsWith('reminder:')) {
-          final parts = response.payload!.split(':');
-          if (parts.length >= 2) {
-            final reminderId = parts[1];
-            _snoozeReminder(reminderId).catchError((error) {
-              debugPrint('❌ Error snoozing reminder: $error');
-            });
-          }
-        }
-        else {
-          // Handle regular notification tap (no action button)
-          debugPrint('📱 Regular notification tap - no specific action needed');
-        }
-      } else {
-        debugPrint('📱 Notification response with no payload');
+      // Cancel the notification since user tapped it
+      final notificationId = reminderId.hashCode.abs() % 100000;
+      await cancelNotification(notificationId);
+      
+      // Navigate to reminders tab (index 1) in main layout
+      final navigatorKey = NavigationStateService.navigatorKey;
+      if (navigatorKey.currentContext != null) {
+        navigatorKey.currentContext!.go('/', extra: {'initialTab': 1});
       }
+      
     } catch (e) {
-      debugPrint('❌ Error handling notification response: $e');
-      // Don't rethrow - we don't want to crash the app
+      debugPrint('❌ Error handling notification tap: $e');
     }
   }
   
-  // Enhanced method to mark a reminder as complete with visual feedback
+  // Enhanced method to mark a reminder as complete with UI updates
   Future<void> _markReminderComplete(String reminderId) async {
-    // Call the static method to ensure consistency
-    await _markReminderCompleteStatic(reminderId);
+    try {
+      debugPrint('🔔 Marking reminder complete: $reminderId');
+      
+      // Validate input
+      if (reminderId.isEmpty) {
+        debugPrint('⚠️ Empty reminder ID provided');
+        return;
+      }
+      
+      final dataService = DataService();
+      final reminders = await dataService.getReminders();
+      
+      if (reminders.isEmpty) {
+        debugPrint('⚠️ No reminders found');
+        return;
+      }
+      
+      final reminderIndex = reminders.indexWhere((r) => r.id == reminderId);
+      
+      if (reminderIndex < 0) {
+        debugPrint('⚠️ Reminder not found: $reminderId');
+        return;
+      }
+      
+      final reminder = reminders[reminderIndex];
+      final updatedReminder = reminder.copyWith(isCompleted: true);
+      
+      // Update reminder in data service (this will notify UI listeners)
+      await dataService.updateReminder(updatedReminder);
+    
+      // Cancel the original notification
+      final notificationId = reminderId.hashCode.abs() % 100000;
+      await cancelNotification(notificationId);
+      
+      // Show completion confirmation
+      await showNotification(
+        title: '✅ Task Completed!',
+        body: '${reminder.title} has been marked as complete',
+        id: 99990 + notificationId,
+        payload: 'feedback:completed',
+      );
+      
+      debugPrint('✅ Marked reminder complete: $reminderId');
+      
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error marking reminder complete: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+    }
   }
   
   // Enhanced method to snooze a reminder with better scheduling
   Future<void> _snoozeReminder(String reminderId) async {
-    // Call the static method to ensure consistency
-    await _snoozeReminderStatic(reminderId);
+    try {
+      debugPrint('🔔 Snoozing reminder: $reminderId');
+      
+      // Validate input
+      if (reminderId.isEmpty) {
+        debugPrint('⚠️ Empty reminder ID provided');
+        return;
+      }
+      
+      final dataService = DataService();
+      final reminders = await dataService.getReminders();
+      
+      if (reminders.isEmpty) {
+        debugPrint('⚠️ No reminders found');
+        return;
+      }
+      
+      final reminder = reminders.where((r) => r.id == reminderId).firstOrNull;
+      
+      if (reminder == null) {
+        debugPrint('⚠️ Reminder not found: $reminderId');
+        return;
+      }
+      
+      final notificationId = reminderId.hashCode.abs() % 100000;
+      
+      // Cancel the current notification
+      await cancelNotification(notificationId);
+      
+      // Calculate snooze time (5 minutes from now)
+      final now = DateTime.now();
+      final snoozeTime = now.add(const Duration(minutes: 5));
+      
+      // Schedule the snoozed notification
+      await scheduleNotification(
+        title: '⏰ ${reminder.title} (Snoozed)',
+        body: 'Snoozed for 5 minutes • Will remind again at ${DateFormat('HH:mm').format(snoozeTime)}',
+        id: notificationId,
+        scheduledTime: snoozeTime,
+        payload: 'reminder:${reminder.id}',
+      );
+      
+      // Show snooze feedback
+      await showNotification(
+        title: '⏰ Reminder Snoozed',
+        body: 'Will remind you again at ${DateFormat('HH:mm').format(snoozeTime)}',
+        id: 99980 + notificationId,
+        payload: 'feedback:snoozed',
+      );
+      
+      debugPrint('✅ Reminder snoozed for 5 minutes: $reminderId');
+      
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error snoozing reminder: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+    }
   }
 
   // Show a simple notification
@@ -537,14 +627,15 @@ class NotificationService extends ChangeNotifier {
         }
       }
     
-      // Create notification details with safer configuration
+      // Create notification details with app icon
       return AndroidNotificationDetails(
         'reminder_channel',
         'Reminders',
         channelDescription: 'Critical reminders that must be delivered',
         importance: Importance.max,
         priority: Priority.max,
-        icon: 'ic_notification',
+        icon: 'ic_notification', // Small icon for status bar
+        largeIcon: const DrawableResourceAndroidBitmap('@mipmap/launcher_icon'), // App icon for notification content
         sound: notificationSound,
         playSound: _soundEnabled,
         enableVibration: vibrate && _vibrationEnabled,
@@ -573,6 +664,8 @@ class NotificationService extends ChangeNotifier {
         channelDescription: 'Critical reminders',
         importance: Importance.max,
         priority: Priority.max,
+        icon: 'ic_notification', // Small icon for status bar
+        largeIcon: DrawableResourceAndroidBitmap('@mipmap/launcher_icon'), // App icon for notification content
         playSound: true,
         enableVibration: true,
         autoCancel: true,
@@ -731,21 +824,27 @@ class NotificationService extends ChangeNotifier {
     }
   }
 
-  // Schedule a notification for a reminder - simplified to prevent crashes
+  // Schedule a notification for a reminder - Enhanced crash prevention
   Future<void> scheduleReminderNotification(Reminder reminder) async {
     if (!_notificationsEnabled || reminder.isCompleted) {
       debugPrint('⚠️ Skipping notification for ${reminder.title}: notificationsEnabled=$_notificationsEnabled, isCompleted=${reminder.isCompleted}');
       return;
     }
     
-    // Simple notification scheduling to prevent crashes
+    // Enhanced notification scheduling with comprehensive error handling
     try {
       debugPrint('🔔 Scheduling notification for: ${reminder.title}');
+      
+      // Validate reminder data
+      if (reminder.id.isEmpty || reminder.title.isEmpty) {
+        debugPrint('⚠️ Invalid reminder data - skipping notification');
+        return;
+      }
       
       // Generate simple notification ID
       final int notificationId = reminder.id.hashCode.abs() % 100000;
       
-      // Calculate schedule time
+      // Calculate schedule time with validation
       DateTime scheduleTime;
       if (reminder.isRepeating && reminder.repeatDays.isNotEmpty) {
         scheduleTime = _getNextReminderOccurrence(reminder) ?? reminder.dateTime;
@@ -759,22 +858,22 @@ class NotificationService extends ChangeNotifier {
         return;
       }
       
-      // Create simple notification title and body
-      final String title = '${reminder.emoji} ${reminder.title}';
+      // Create safe notification title and body
+      final String title = '${reminder.emoji} ${reminder.title}'.trim();
       final String body = reminder.description.isNotEmpty 
-          ? reminder.description 
+          ? reminder.description.trim()
           : 'Reminder scheduled for ${DateFormat('h:mm a').format(scheduleTime)}';
       
-      // Convert to timezone
+      // Convert to timezone safely
       final tzScheduleTime = tz.TZDateTime.from(scheduleTime, tz.local);
       
-      // Schedule with enhanced configuration for better visibility
+      // Schedule with simplified configuration to prevent crashes
       await _flutterLocalNotificationsPlugin.zonedSchedule(
         notificationId,
         title,
         body,
         tzScheduleTime,
-        const NotificationDetails(
+        NotificationDetails(
           android: AndroidNotificationDetails(
             'reminder_channel',
             'Reminders',
@@ -782,26 +881,23 @@ class NotificationService extends ChangeNotifier {
             importance: Importance.max,
             priority: Priority.max,
             autoCancel: false,
-            icon: 'ic_notification',
+            icon: 'ic_notification', // Small icon for status bar
+            largeIcon: const DrawableResourceAndroidBitmap('@mipmap/launcher_icon'), // App icon for notification content
             showWhen: true,
-            enableVibration: true,
-            playSound: true,
+            enableVibration: _vibrationEnabled,
+            playSound: _soundEnabled,
             ongoing: false,
-            fullScreenIntent: true, // Helps show heads-up notifications
-            actions: <AndroidNotificationAction>[
-              AndroidNotificationAction(
-                'mark_complete',
-                '✅ Complete',
-                icon: DrawableResourceAndroidBitmap('ic_check_complete'),
-                showsUserInterface: false,
-              ),
-              AndroidNotificationAction(
-                'snooze_reminder',
-                '⏰ Snooze +5min',
-                icon: DrawableResourceAndroidBitmap('ic_snooze'),
-                showsUserInterface: false,
-              ),
-            ],
+            ticker: 'Reminder from Lilas Kokoro',
+            visibility: NotificationVisibility.public,
+            category: AndroidNotificationCategory.reminder,
+            // No action buttons - just tap to open
+            // actions: [], // Removed action buttons as they weren't working reliably
+          ),
+          iOS: DarwinNotificationDetails(
+            categoryIdentifier: 'reminder_category',
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: _soundEnabled,
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -809,9 +905,24 @@ class NotificationService extends ChangeNotifier {
       );
       
       debugPrint('✅ Notification scheduled successfully for ${reminder.title} at $scheduleTime');
+      debugPrint('🆔 Notification ID: $notificationId');
       
-    } catch (e) {
-      debugPrint('❌ Error scheduling notification for ${reminder.title}: $e');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Critical error scheduling notification for ${reminder.title}: $e');
+      debugPrint('❌ Stack trace: $stackTrace');
+      
+      // Try to show a simple notification as fallback
+      try {
+        await showNotification(
+          title: '⚠️ Reminder Scheduling Error',
+          body: 'Could not schedule reminder: ${reminder.title}',
+          id: 99997,
+          payload: 'error:scheduling',
+        );
+      } catch (fallbackError) {
+        debugPrint('❌ Fallback notification also failed: $fallbackError');
+      }
+      
       // Don't rethrow - allow app to continue
     }
   }
@@ -931,6 +1042,44 @@ class NotificationService extends ChangeNotifier {
       debugPrint('❌ Error stopping sound: $e');
     }
   }
+
+  // Test notification with action buttons
+  Future<void> sendTestNotificationWithActions() async {
+    if (kIsWeb) return;
+    
+    try {
+      debugPrint('🧪 Sending test notification with action buttons...');
+      
+      await _flutterLocalNotificationsPlugin.show(
+        88888,
+        '🧪 Test Notification',
+        'Tap to test navigation to reminders tab!',
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'test_channel',
+            'Test Notifications',
+            channelDescription: 'Test notifications with action buttons',
+            importance: Importance.max,
+            priority: Priority.high,
+            icon: 'ic_notification',
+            largeIcon: DrawableResourceAndroidBitmap('@mipmap/launcher_icon'),
+            showWhen: true,
+            enableVibration: true,
+            playSound: true,
+            autoCancel: true,
+            // No action buttons - simplified for reliability
+            // actions: [],
+          ),
+        ),
+        payload: 'reminder:test-id-12345',
+      );
+      
+      debugPrint('✅ Test notification sent with actions');
+      
+    } catch (e) {
+      debugPrint('❌ Error sending test notification: $e');
+    }
+  }
   
   // Reschedule all active reminders
   Future<void> rescheduleAllReminders() async {
@@ -1036,7 +1185,8 @@ class NotificationService extends ChangeNotifier {
               channelDescription: 'Test notifications for debugging',
               importance: Importance.max,
               priority: Priority.max,
-              icon: 'ic_notification',
+              icon: 'ic_notification', // Small icon for status bar
+              largeIcon: DrawableResourceAndroidBitmap('@mipmap/launcher_icon'), // App icon for notification content
               showWhen: true,
               enableVibration: true,
               playSound: true,
@@ -1067,7 +1217,8 @@ class NotificationService extends ChangeNotifier {
               channelDescription: 'Test scheduled notifications',
               importance: Importance.max,
               priority: Priority.max,
-              icon: 'ic_notification',
+              icon: 'ic_notification', // Small icon for status bar
+              largeIcon: DrawableResourceAndroidBitmap('@mipmap/launcher_icon'), // App icon for notification content
               showWhen: true,
               enableVibration: true,
               playSound: true,
@@ -1133,7 +1284,8 @@ class NotificationService extends ChangeNotifier {
             channelDescription: 'Immediate test notifications',
             importance: Importance.max,
             priority: Priority.max,
-            icon: 'ic_notification', // Your custom icon
+            icon: 'ic_notification', // Small icon for status bar
+            largeIcon: DrawableResourceAndroidBitmap('@mipmap/launcher_icon'), // App icon for notification content
             ticker: 'Immediate test notification',
           ),
         ),
@@ -1235,26 +1387,54 @@ class NotificationService extends ChangeNotifier {
     }
   }
 
-  // Static method to mark a reminder as complete (for background processing)
+  // Static method to mark a reminder as complete (for background processing) - Enhanced crash prevention
   static Future<void> _markReminderCompleteStatic(String reminderId) async {
     try {
       debugPrint('🔔 Static: Marking reminder complete: $reminderId');
       
+      // Validate input
+      if (reminderId.isEmpty) {
+        debugPrint('⚠️ Static: Empty reminder ID provided');
+        return;
+      }
+      
       final dataService = DataService();
       final reminders = await dataService.getReminders();
+      
+      if (reminders.isEmpty) {
+        debugPrint('⚠️ Static: No reminders found');
+        return;
+      }
+      
       final reminderIndex = reminders.indexWhere((r) => r.id == reminderId);
       
-      if (reminderIndex >= 0) {
+      if (reminderIndex < 0) {
+        debugPrint('⚠️ Static: Reminder not found: $reminderId');
+        return;
+      }
+      
         final reminder = reminders[reminderIndex];
         final updatedReminder = reminder.copyWith(isCompleted: true);
+      
+      // Update reminder in data service (this will notify UI listeners)
         await dataService.updateReminder(updatedReminder);
       
-        // Cancel the original notification
+      // Cancel the original notification safely
+      try {
         final notificationId = reminderId.hashCode.abs() % 100000;
         final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
         await flutterLocalNotificationsPlugin.cancel(notificationId);
+        debugPrint('✅ Static: Cancelled notification: $notificationId');
+      } catch (e) {
+        debugPrint('⚠️ Static: Error cancelling notification: $e');
+        // Continue - not critical
+      }
+      
+      // Show completion confirmation safely
+      try {
+        final notificationId = reminderId.hashCode.abs() % 100000;
+        final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
         
-        // Show completion confirmation
         await flutterLocalNotificationsPlugin.show(
           99990 + notificationId,
           '✅ Task Completed!',
@@ -1266,7 +1446,7 @@ class NotificationService extends ChangeNotifier {
               channelDescription: 'Confirmations when tasks are completed',
               importance: Importance.low,
               priority: Priority.low,
-              icon: 'ic_check_complete',
+              icon: 'ic_notification',
               autoCancel: true,
               ongoing: false,
               showWhen: true,
@@ -1277,54 +1457,80 @@ class NotificationService extends ChangeNotifier {
               category: AndroidNotificationCategory.status,
             ),
           ),
+          payload: 'feedback:completed',
         );
         
         debugPrint('✅ Static: Marked reminder complete: $reminderId');
-      }
     } catch (e) {
-      debugPrint('❌ Static: Error marking reminder complete: $e');
+        debugPrint('⚠️ Static: Error showing completion notification: $e');
+        // Continue - main task is done
+      }
+      
+    } catch (e, stackTrace) {
+      debugPrint('❌ Static: Critical error marking reminder complete: $e');
+      debugPrint('❌ Static: Stack trace: $stackTrace');
+      // Don't rethrow - prevent app crashes
     }
   }
   
-  // Static method to snooze a reminder (for background processing)
+  // Static method to snooze a reminder (for background processing) - Enhanced crash prevention
   static Future<void> _snoozeReminderStatic(String reminderId) async {
     try {
       debugPrint('🔔 Static: Snoozing reminder: $reminderId');
       
+      // Validate input
+      if (reminderId.isEmpty) {
+        debugPrint('⚠️ Static: Empty reminder ID provided');
+        return;
+      }
+      
       final dataService = DataService();
       final reminders = await dataService.getReminders();
-      final reminder = reminders.firstWhere(
-        (r) => r.id == reminderId,
-        orElse: () => null as Reminder,
-      );
       
-      if (reminder != null) {
+      if (reminders.isEmpty) {
+        debugPrint('⚠️ Static: No reminders found');
+        return;
+      }
+      
+      final reminder = reminders.where((r) => r.id == reminderId).firstOrNull;
+      
+      if (reminder == null) {
+        debugPrint('⚠️ Static: Reminder not found: $reminderId');
+        return;
+      }
+      
         final notificationId = reminderId.hashCode.abs() % 100000;
         final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
         
-        // Cancel the current notification
+      // Cancel the current notification safely
+      try {
         await flutterLocalNotificationsPlugin.cancel(notificationId);
+        debugPrint('✅ Static: Cancelled original notification: $notificationId');
+      } catch (e) {
+        debugPrint('⚠️ Static: Error cancelling notification: $e');
+        // Continue - not critical
+      }
         
-        // Calculate snooze time
-        final originalTime = reminder.dateTime;
+      // Calculate snooze time (5 minutes from now)
         final now = DateTime.now();
-        final baseTime = originalTime.isBefore(now) ? now : originalTime;
-        final snoozeTime = baseTime.add(const Duration(minutes: 5));
+      final snoozeTime = now.add(const Duration(minutes: 5));
         
-        // Schedule the snoozed notification
+      // Schedule the snoozed notification safely
+      try {
         await flutterLocalNotificationsPlugin.zonedSchedule(
           notificationId,
           '⏰ ${reminder.title} (Snoozed)',
           'Snoozed for 5 minutes • Will remind again at ${DateFormat('HH:mm').format(snoozeTime)}',
           tz.TZDateTime.from(snoozeTime, tz.local),
-          NotificationDetails(
+          const NotificationDetails(
             android: AndroidNotificationDetails(
               'reminder_channel',
               'Reminders',
               channelDescription: 'Snoozed reminders',
               importance: Importance.max,
               priority: Priority.max,
-              icon: 'ic_notification',
+              icon: 'ic_notification', // Small icon for status bar
+              largeIcon: DrawableResourceAndroidBitmap('@mipmap/launcher_icon'), // App icon for notification content
               showWhen: true,
               enableVibration: true,
               playSound: true,
@@ -1333,39 +1539,34 @@ class NotificationService extends ChangeNotifier {
               ticker: 'Snoozed reminder from Lilas Kokoro',
               visibility: NotificationVisibility.public,
               category: AndroidNotificationCategory.reminder,
-              actions: <AndroidNotificationAction>[
-                AndroidNotificationAction(
-                  'mark_complete',
-                  '✅ Complete',
-                  icon: DrawableResourceAndroidBitmap('ic_check_complete'),
-                  showsUserInterface: false,
-                ),
-                AndroidNotificationAction(
-                  'snooze_reminder',
-                  '⏰ Snooze +5min',
-                  icon: DrawableResourceAndroidBitmap('ic_snooze'),
-                  showsUserInterface: false,
-                ),
-              ],
+              // No action buttons - simplified for reliability
+              // actions: [],
             ),
           ),
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
           payload: 'reminder:${reminder.id}',
         );
         
-        // Show snooze feedback
+        debugPrint('✅ Static: Scheduled snoozed notification for: ${snoozeTime.toString()}');
+      } catch (e) {
+        debugPrint('❌ Static: Error scheduling snoozed notification: $e');
+        // Continue to show feedback
+      }
+      
+      // Show snooze feedback safely
+      try {
         await flutterLocalNotificationsPlugin.show(
           99980 + notificationId,
           '⏰ Reminder Snoozed',
           'Will remind you again at ${DateFormat('HH:mm').format(snoozeTime)}',
           const NotificationDetails(
             android: AndroidNotificationDetails(
-              'snooze_feedback_channel',
-              'Snooze Confirmations',
+              'completion_channel',
+              'Task Completions',
               channelDescription: 'Confirmations when reminders are snoozed',
               importance: Importance.low,
               priority: Priority.low,
-              icon: 'ic_snooze',
+              icon: 'ic_notification',
               autoCancel: true,
               ongoing: false,
               showWhen: true,
@@ -1376,12 +1577,289 @@ class NotificationService extends ChangeNotifier {
               category: AndroidNotificationCategory.status,
             ),
           ),
+          payload: 'feedback:snoozed',
         );
         
         debugPrint('✅ Static: Reminder snoozed for 5 minutes: $reminderId');
+      } catch (e) {
+        debugPrint('⚠️ Static: Error showing snooze feedback: $e');
+        // Main task is done
       }
+      
+    } catch (e, stackTrace) {
+      debugPrint('❌ Static: Critical error snoozing reminder: $e');
+      debugPrint('❌ Static: Stack trace: $stackTrace');
+      // Don't rethrow - prevent app crashes
+    }
+  }
+
+  // Helper method to show error notifications
+  Future<void> _showErrorNotification(String message) async {
+    try {
+      await showNotification(
+        title: '⚠️ Notification Error',
+        body: message,
+        id: 99999,
+        payload: 'error:notification',
+      );
     } catch (e) {
-      debugPrint('❌ Static: Error snoozing reminder: $e');
+      debugPrint('❌ Failed to show error notification: $e');
+    }
+  }
+
+  /// Enhanced notification response handler for new notification system
+  static Future<void> _onNotificationResponseNew(NotificationResponse response) async {
+    try {
+      debugPrint('📱 New notification response: ${response.actionId}, payload: ${response.payload}');
+      
+      if (response.payload == null || response.payload!.isEmpty) {
+        debugPrint('⚠️ Empty payload received');
+        return;
+      }
+
+      // Handle simple payloads (legacy format)
+      if (response.payload!.startsWith('reminder:')) {
+        final parts = response.payload!.split(':');
+        if (parts.length >= 2) {
+          final reminderId = parts[1];
+          await _handleReminderAction(response.actionId, reminderId);
+        }
+        return;
+      }
+
+      // Handle JSON payloads (new format)
+      try {
+        final data = jsonDecode(response.payload!) as Map<String, dynamic>;
+        final String type = data['type'] ?? '';
+        
+        switch (type) {
+          case 'reminder':
+            final reminderId = data['reminder_id'] ?? '';
+            await _handleReminderAction(response.actionId, reminderId);
+            break;
+            
+          case 'test':
+          case 'error':
+          case 'feedback':
+            // No action needed for these types
+            break;
+            
+          default:
+            debugPrint('⚠️ Unknown notification type: $type');
+            break;
+        }
+      } catch (e) {
+        debugPrint('❌ Failed to parse JSON payload: $e');
+      }
+      
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error in notification response handler: $e');
+      debugPrint('Stack trace: $stackTrace');
+    }
+  }
+
+  /// Handle reminder actions (only tap to navigate now)
+  static Future<void> _handleReminderAction(String? actionId, String reminderId) async {
+    try {
+      if (reminderId.isEmpty) {
+        debugPrint('⚠️ Empty reminder ID');
+        return;
+      }
+
+      debugPrint('🔔 Handling reminder tap for ID: $reminderId');
+
+      // Cancel the notification first
+      final notificationId = reminderId.hashCode.abs() % 100000;
+      await FlutterLocalNotificationsPlugin().cancel(notificationId);
+
+      // Handle test notifications
+      if (reminderId.startsWith('test-id')) {
+        debugPrint('🧪 Test notification tapped - navigating to reminders');
+        await _navigateToReminders();
+        return;
+      }
+
+      // All taps navigate to reminders tab
+      await _navigateToReminders();
+      
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error handling reminder action: $e');
+      debugPrint('Stack trace: $stackTrace');
+    }
+  }
+
+  /// Navigate to reminders tab
+  static Future<void> _navigateToReminders() async {
+    try {
+      final navigatorKey = NavigationStateService.navigatorKey;
+      if (navigatorKey.currentContext == null) {
+        debugPrint('⚠️ Navigator context is null, cannot navigate');
+        return;
+      }
+
+      debugPrint('🧭 Navigating to reminders tab (index 1)');
+
+      // Use the correct navigation method that matches the app's routing system
+      await Navigator.of(navigatorKey.currentContext!).pushNamedAndRemoveUntil(
+        '/', // Routes.home
+        (route) => false, // Remove all previous routes
+        arguments: {'initialTab': 1}, // Pass initialTab as arguments
+      );
+
+      debugPrint('✅ Navigation to reminders completed');
+      
+    } catch (e, stackTrace) {
+      debugPrint('❌ Navigation error: $e');
+      debugPrint('Stack trace: $stackTrace');
+    }
+  }
+
+  /// Mark reminder as complete (new implementation)
+  static Future<void> _markReminderCompleteNew(String reminderId) async {
+    try {
+      debugPrint('✅ Marking reminder complete: $reminderId');
+      
+      // Handle test notifications
+      if (reminderId.startsWith('test-id')) {
+        debugPrint('🧪 Test notification - Complete button works!');
+        // Complete button works
+        
+        // Cancel the test notification
+        await FlutterLocalNotificationsPlugin().cancel(88888);
+        return;
+      }
+      
+      final dataService = DataService();
+      final reminders = await dataService.getReminders();
+      final reminder = reminders.where((r) => r.id == reminderId).firstOrNull;
+      
+      if (reminder == null) {
+        debugPrint('⚠️ Reminder not found: $reminderId');
+        return;
+      }
+
+      // Update reminder as completed
+      final updatedReminder = reminder.copyWith(isCompleted: true);
+      await dataService.updateReminder(updatedReminder);
+      debugPrint('📝 Reminder marked complete in DataService');
+
+      // Cancel the notification
+      final notificationId = reminderId.hashCode.abs() % 100000;
+      await FlutterLocalNotificationsPlugin().cancel(notificationId);
+      debugPrint('🔕 Notification cancelled');
+
+      // Task completed successfully
+      
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error completing reminder: $e');
+      debugPrint('Stack trace: $stackTrace');
+              // Failed to complete task
+    }
+  }
+
+  /// Snooze reminder for 5 minutes (new implementation)
+  static Future<void> _snoozeReminderNew(String reminderId) async {
+    try {
+      debugPrint('😴 Snoozing reminder: $reminderId');
+      
+      // Handle test notifications
+      if (reminderId.startsWith('test-id')) {
+        debugPrint('🧪 Test notification - Snooze button works!');
+        
+        // Cancel the test notification
+        await FlutterLocalNotificationsPlugin().cancel(88888);
+        
+        // Show snooze feedback with actual time
+        final snoozeTime = DateTime.now().add(const Duration(minutes: 5));
+        final formattedTime = '${snoozeTime.hour.toString().padLeft(2, '0')}:${snoozeTime.minute.toString().padLeft(2, '0')}';
+        // Snooze button works
+        return;
+      }
+      
+      final dataService = DataService();
+      final reminders = await dataService.getReminders();
+      final reminder = reminders.where((r) => r.id == reminderId).firstOrNull;
+      
+      if (reminder == null) {
+        debugPrint('⚠️ Reminder not found: $reminderId');
+        return;
+      }
+
+      final notificationId = reminderId.hashCode.abs() % 100000;
+      
+      // Cancel current notification
+      await FlutterLocalNotificationsPlugin().cancel(notificationId);
+      debugPrint('🔕 Original notification cancelled');
+
+      // Calculate snooze time (5 minutes from now)
+      final snoozeTime = DateTime.now().add(const Duration(minutes: 5));
+      final formattedTime = '${snoozeTime.hour.toString().padLeft(2, '0')}:${snoozeTime.minute.toString().padLeft(2, '0')}';
+      
+      // Schedule new notification with corrected parameters
+      await FlutterLocalNotificationsPlugin().zonedSchedule(
+        notificationId,
+        '😴 Snoozed: ${reminder.title}',
+        'Will remind again at $formattedTime',
+        tz.TZDateTime.from(snoozeTime, tz.local),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'reminder_channel',
+            'Reminder Notifications',
+            channelDescription: 'Snoozed reminders',
+            importance: Importance.max,
+            priority: Priority.high,
+            showWhen: true,
+            enableVibration: true,
+            playSound: true,
+            autoCancel: false,
+            actions: [
+              AndroidNotificationAction(
+                'mark_complete',
+                '✅ Complete',
+                showsUserInterface: false,
+              ),
+              AndroidNotificationAction(
+                'snooze_reminder',
+                '😴 Snooze +5min',
+                showsUserInterface: false,
+              ),
+            ],
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: 'reminder:$reminderId',
+      );
+      
+      debugPrint('⏰ Snoozed notification scheduled for: $snoozeTime');
+      
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error snoozing reminder: $e');
+      debugPrint('Stack trace: $stackTrace');
+              // Failed to snooze reminder
+    }
+  }
+
+  /// Show simple feedback notification
+  static Future<void> _showSimpleFeedback(String message) async {
+    try {
+      await FlutterLocalNotificationsPlugin().show(
+        999999,
+        'Lilas Kokoro',
+        message,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'feedback_channel',
+            'Feedback Notifications',
+            channelDescription: 'User feedback notifications',
+            importance: Importance.low,
+            priority: Priority.low,
+            autoCancel: true,
+            timeoutAfter: 3000,
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('❌ Failed to show feedback: $e');
     }
   }
 }

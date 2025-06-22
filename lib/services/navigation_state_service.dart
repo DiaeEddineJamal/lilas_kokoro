@@ -1,11 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class NavigationStateService extends ChangeNotifier {
   bool _onboardingCompleted = false;
   bool _permissionsGranted = false;
   bool _initialized = false;
+
+  // Global navigator key for navigation from notification callbacks
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   bool get onboardingCompleted => _onboardingCompleted;
   bool get permissionsGranted => _permissionsGranted;
@@ -270,6 +275,45 @@ class NavigationStateService extends ChangeNotifier {
       debugPrint('🧹 Fresh install markers removed - next launch will be treated as fresh install');
     } catch (e) {
       debugPrint('❌ Error removing fresh install markers: $e');
+    }
+  }
+
+  // Global navigation method for notification callbacks
+  static Future<void> navigateFromNotification(String route, {Object? arguments}) async {
+    try {
+      final context = navigatorKey.currentContext;
+      if (context != null) {
+        debugPrint('📱 Navigating from notification to: $route');
+        
+        // Use GoRouter for navigation
+        if (route == '/reminders') {
+          context.go('/dashboard'); // Navigate to main layout which includes reminders
+          // You could also use context.go('/reminders') if you have a direct route
+        } else {
+          context.go(route);
+        }
+      } else {
+        debugPrint('⚠️ Navigation context not available for notification navigation');
+      }
+    } catch (e) {
+      debugPrint('❌ Error navigating from notification: $e');
+    }
+  }
+  
+  // Method to handle deep links from notifications
+  static Future<void> handleNotificationDeepLink(String payload) async {
+    try {
+      debugPrint('📱 Handling notification deep link: $payload');
+      
+      if (payload.startsWith('navigate:')) {
+        final route = payload.substring(9); // Remove 'navigate:' prefix
+        await navigateFromNotification('/$route');
+      } else if (payload.startsWith('reminder:')) {
+        // Navigate to reminders screen for reminder notifications
+        await navigateFromNotification('/dashboard');
+      }
+    } catch (e) {
+      debugPrint('❌ Error handling notification deep link: $e');
     }
   }
 } 

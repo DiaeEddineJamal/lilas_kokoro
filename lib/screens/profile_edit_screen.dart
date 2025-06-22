@@ -109,17 +109,25 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated successfully!')),
-        );
+              ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Profile updated successfully!'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
         // Return true to indicate changes were made
         Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving profile: $e')),
-        );
+              ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving profile: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       }
     } finally {
       setState(() {
@@ -146,9 +154,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
-        );
+              ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error picking image: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       }
     }
   }
@@ -343,41 +355,60 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   // Updated Save Button to match Save Reminder
   Widget _buildSaveButton(ThemeService themeService) {
+    final isDarkMode = themeService.isDarkMode;
+    
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
         child: SizedBox(
           width: double.infinity,
           height: 50,
-          child: Material(
-            color: themeService.primary, // Use dynamic theme color
-            borderRadius: BorderRadius.circular(16), // Match Save Reminder radius
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16), // Match Save Reminder radius
-              onTap: _hasChanges && !_isLoading ? _saveUserData : null,
-              child: Center(
-                child: _isLoading
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2.0,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDarkMode ? themeService.darkGradient : themeService.lightGradient,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: themeService.primary.withOpacity(0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: _hasChanges && !_isLoading ? _saveUserData : null,
+                child: Center(
+                  child: _isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.0,
+                        ),
+                      )
+                    : const Text(
+                        'Save Changes',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
-                    )
-                  : const Text(
-                      'Save Changes',
-                      style: TextStyle(
-                        fontSize: 18, // Match Save Reminder text style
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                                ),
-                    ),
+                ),
               ),
             ),
           ),
-                ),
-              ),
+        ),
+      ),
     );
   }
 }

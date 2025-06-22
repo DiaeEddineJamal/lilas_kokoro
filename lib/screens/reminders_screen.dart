@@ -141,32 +141,47 @@ class _RemindersScreenState extends State<RemindersScreen> with AutomaticKeepAli
           child: _buildContent(isDarkMode, dataService, themeService),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const ReminderEditorScreen(),
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            colors: Provider.of<ThemeService>(context).isDarkMode 
+              ? Provider.of<ThemeService>(context).darkGradient 
+              : Provider.of<ThemeService>(context).lightGradient,
+            radius: 1.0,
+          ),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Provider.of<ThemeService>(context).primary.withOpacity(0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
-          );
-          
-          // Refresh data quietly if a reminder was added/edited
-          if (result == true) {
-            _loadRemindersQuietly();
-          }
-        },
-        backgroundColor: themeService.primary,
-        elevation: 4,
-        tooltip: 'Add Reminder',
-        heroTag: 'reminderButton',
-        mini: false,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
+          ],
         ),
-        child: const Icon(
-          Icons.add,
-          color: Colors.white,
-          size: 24,
+        child: FloatingActionButton(
+          onPressed: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ReminderEditorScreen(),
+              ),
+            );
+            
+            // Refresh data quietly if a reminder was added/edited
+            if (result == true) {
+              _loadRemindersQuietly();
+            }
+          },
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          tooltip: 'Add Reminder',
+          heroTag: 'reminderButton',
+          mini: false,
+          child: const Icon(
+            Icons.add,
+            color: Colors.white,
+            size: 24,
+          ),
         ),
       ),
     );
@@ -247,16 +262,48 @@ class _RemindersScreenState extends State<RemindersScreen> with AutomaticKeepAli
         return await showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Delete Reminder'),
-            content: const Text('Are you sure you want to delete this reminder?'),
+            backgroundColor: isDarkMode ? const Color(0xFF383844) : Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Text(
+              'Delete Reminder',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black87,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: Text(
+              'Are you sure you want to delete this reminder?',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white70 : Colors.black54,
+              ),
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                  ),
+                ),
               ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Delete'),
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.red.shade600,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
@@ -274,9 +321,13 @@ class _RemindersScreenState extends State<RemindersScreen> with AutomaticKeepAli
           
           // Delete the reminder from data service
           await dataService.deleteReminder(reminder.id);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Reminder deleted')),
-          );
+                  ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Reminder deleted'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
         });
       },
       child: Card(

@@ -105,9 +105,13 @@ class _MilestoneEditorScreenState extends State<MilestoneEditorScreen> {
         Navigator.pop(context);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving milestone: $e')),
-      );
+              ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving milestone: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
     } finally {
       if (mounted) {
         setState(() {
@@ -339,23 +343,40 @@ class _MilestoneEditorScreenState extends State<MilestoneEditorScreen> {
               SizedBox(
                 width: double.infinity,
                 height: 50,
-                child: Material(
-                  color: themeService.primary,
-                  borderRadius: BorderRadius.circular(16),
-                  child: InkWell(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isDarkMode ? themeService.darkGradient : themeService.lightGradient,
+                    ),
                     borderRadius: BorderRadius.circular(16),
-                    onTap: _isSaving ? null : _saveMilestone,
-                    child: Center(
-                      child: _isSaving
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : Text(
-                              'Save Milestone',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: themeService.primary.withOpacity(0.4),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: _isSaving ? null : _saveMilestone,
+                      child: Center(
+                        child: _isSaving
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : Text(
+                                'Save Milestone',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
-                            ),
+                      ),
                     ),
                   ),
                 ),

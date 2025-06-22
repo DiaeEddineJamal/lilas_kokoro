@@ -47,21 +47,21 @@ dependencies:
   url_launcher: ^6.2.4
   # Add generative art backgrounds package
   gen_art_bg: ^0.0.2
-  # Add markdown support for AI replies
-  flutter_markdown: ^0.6.18
+
   # Add syntax highlighting for code blocks
   flutter_highlight: ^0.7.0
+
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  # Add build_runner and envied_generator
-  build_runner: ^2.4.7
+  # Add build_runner for code generation
+  build_runner: ^2.4.15
+  # Add envied_generator for environment variable generation
   envied_generator: ^0.5.3
   # Add flutter_launcher_icons for custom app icon
-  flutter_launcher_icons: ^0.13.1
-
+  flutter_launcher_icons: ^0.14.4
 flutter:
   uses-material-design: true
   assets:
@@ -77,24 +77,24 @@ flutter:
       fonts:
         - asset: assets/fonts/Barriecito-Regular.ttf
 
-# Configuration for flutter_launcher_icons
 flutter_launcher_icons:
-  android: "launcher_icon"
+  android: true
   ios: true
   image_path: "assets/images/App-icon.png"
-  min_sdk_android: 21 # android min sdk min:16, default 21
+  adaptive_icon_background: "#1A1A1A" # A dark background to complement the icon
+  adaptive_icon_foreground: "assets/images/App-icon.png" # Use the icon for foreground
   remove_alpha_ios: true
-  adaptive_icon_background: "#FF69B4"
-  adaptive_icon_foreground: "assets/images/App-icon.png"
+  # Optimized adaptive icon configuration for seamless appearance
+  # Remove android_13 config as it's not needed
   web:
     generate: true
-    image_path: "assets/images/App-icon.png"
-    background_color: "#FF69B4"
-    theme_color: "#FF69B4"
+    image_path: "assets/images/App-icon-512.png"
+    background_color: "#FF85A2"
+    theme_color: "#FF85A2"
   windows:
     generate: true
-    image_path: "assets/images/App-icon.png"
-    icon_size: 48 # min:48, max:256, default: 48
+    image_path: "assets/images/App-icon-512.png"
+    icon_size: 48
   macos:
     generate: true
-    image_path: "assets/images/App-icon.png"
+    image_path: "assets/images/App-icon-512.png"

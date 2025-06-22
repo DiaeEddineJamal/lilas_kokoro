@@ -109,11 +109,10 @@ class AppScaffold extends StatelessWidget {
     Color baseColor,
     ThemeService themeService,
   ) {
-    // Use consistent gradient colors for app header regardless of theme mode
-    List<Color> gradientColors = [
-      const Color(0xFFFF85A2), // Light pink
-      const Color(0xFFFF6B94), // Slightly darker pink
-    ];
+    // Use dynamic theme gradient colors for app header
+    List<Color> gradientColors = isDarkMode 
+      ? themeService.darkGradient
+      : themeService.lightGradient;
     
     return Container(
       height: MediaQuery.of(context).padding.top + 56,
@@ -183,11 +182,10 @@ class AppScaffold extends StatelessWidget {
   ) {
     final Size size = MediaQuery.of(context).size;
     
-    // Use the SAME gradient colors as the app bar for consistency regardless of theme
-    List<Color> gradientColors = [
-      const Color(0xFFFF85A2), // Light pink
-      const Color(0xFFFF6B94), // Slightly darker pink
-    ];
+    // Use dynamic theme gradient colors for bottom nav (same as app bar)
+    List<Color> gradientColors = isDarkMode 
+      ? themeService.darkGradient
+      : themeService.lightGradient;
     
     return Container(
       height: 64,

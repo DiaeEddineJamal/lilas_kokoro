@@ -10,6 +10,7 @@ import '../models/user_model.dart';
 import '../services/data_service.dart';
 import '../services/theme_service.dart';
 import 'milestone_editor_screen.dart';
+import 'love_counter_edit_screen.dart';
 import 'package:uuid/uuid.dart';
 import '../widgets/skeleton_loader.dart';
 import '../widgets/m3_card.dart';
@@ -18,27 +19,18 @@ import '../services/skeleton_service.dart';
 import '../widgets/gradient_app_bar.dart';
 
 class LoveCounterScreen extends StatefulWidget {
-  final Function(String?, VoidCallback?)? onAppBarUpdate;
-  
-  const LoveCounterScreen({Key? key, this.onAppBarUpdate}) : super(key: key);
+  const LoveCounterScreen({Key? key}) : super(key: key);
 
   @override
   State<LoveCounterScreen> createState() => _LoveCounterScreenState();
 }
 
 class _LoveCounterScreenState extends State<LoveCounterScreen> {
-  final TextEditingController _userNameController = TextEditingController();
-  final TextEditingController _partnerNameController = TextEditingController();
-  DateTime _anniversaryDate = DateTime.now();
-  String _selectedEmoji = '❤️';
-  bool _isEditing = false;
   LoveCounter? _loveCounter;
   
   // Timer for live countdown
   Timer? _countdownTimer;
   DateTime _now = DateTime.now();
-
-  final List<String> _emojis = ['❤️', '💖', '💕', '💓', '💗', '💘', '💝', '💞', '💟', '❤️‍🔥'];
 
   @override
   void initState() {
@@ -51,9 +43,6 @@ class _LoveCounterScreenState extends State<LoveCounterScreen> {
 
   @override
   void dispose() {
-    _userNameController.dispose();
-    _partnerNameController.dispose();
-    
     // Cancel timer to prevent memory leaks
     _countdownTimer?.cancel();
     
@@ -82,12 +71,6 @@ class _LoveCounterScreenState extends State<LoveCounterScreen> {
         if (mounted) {
           setState(() {
             _loveCounter = loveCounter;
-            if (loveCounter != null) {
-              _userNameController.text = loveCounter.userName;
-              _partnerNameController.text = loveCounter.partnerName;
-              _anniversaryDate = loveCounter.anniversaryDate;
-              _selectedEmoji = loveCounter.emoji;
-            }
           });
         }
       } catch (e) {
@@ -100,78 +83,6 @@ class _LoveCounterScreenState extends State<LoveCounterScreen> {
     await _loadLoveCounter();
   }
 
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _anniversaryDate,
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-      builder: (BuildContext context, Widget? child) {
-        return Theme(
-          data: ThemeData.light().copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Provider.of<ThemeService>(context, listen: false).primary,
-            ),
-            dialogBackgroundColor: Colors.white,
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null && picked != _anniversaryDate) {
-      setState(() {
-        _anniversaryDate = picked;
-      });
-    }
-  }
-
-  Future<void> _saveLoveCounter() async {
-    if (_userNameController.text.isEmpty || _partnerNameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
-      );
-      return;
-    }
-
-    final skeletonService = Provider.of<SkeletonService>(context, listen: false);
-    skeletonService.showLoader();
-
-    try {
-      final userId = Provider.of<UserModel>(context, listen: false).id;
-      final dataService = Provider.of<DataService>(context, listen: false);
-
-      final loveCounter = LoveCounter(
-        id: _loveCounter?.id ?? const Uuid().v4(),
-        userId: userId,
-        userName: _userNameController.text,
-        partnerName: _partnerNameController.text,
-        anniversaryDate: _anniversaryDate,
-        emoji: _selectedEmoji,
-        milestones: _loveCounter?.milestones ?? [],
-      );
-
-      await dataService.updateLoveCounter(loveCounter);
-
-      if (mounted) {
-        setState(() {
-          _loveCounter = loveCounter;
-          _isEditing = false;
-        });
-        // Update the app bar to remove the edit title
-        widget.onAppBarUpdate?.call(null, null);
-      }
-    } catch (e) {
-      debugPrint('Error saving love counter: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving: $e')),
-      );
-    } finally {
-      if (mounted) {
-        skeletonService.hideLoader();
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final themeService = Provider.of<ThemeService>(context);
@@ -180,400 +91,301 @@ class _LoveCounterScreenState extends State<LoveCounterScreen> {
     final theme = Theme.of(context);
     final backgroundColor = theme.scaffoldBackgroundColor;
 
-    // Build the main content based on state
-    Widget buildContent() {
-      if (_isEditing || _loveCounter == null) {
-        return RefreshIndicator(
-          onRefresh: _onRefresh,
-          color: themeService.primary,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Names Card - Consistent with reminder card styling
-                Card(
-                  elevation: 2,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  color: isDarkMode ? const Color(0xFF383844) : Colors.white,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Names',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: isDarkMode ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: _userNameController,
-                          decoration: InputDecoration(
-                            labelText: 'Your Name',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            prefixIcon: const Icon(Icons.person),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: _partnerNameController,
-                          decoration: InputDecoration(
-                            labelText: 'Partner\'s Name',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            prefixIcon: const Icon(Icons.favorite),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Anniversary Date Card
-                Card(
-                  elevation: 2,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  color: isDarkMode ? const Color(0xFF383844) : Colors.white,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Anniversary Date',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: isDarkMode ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        InkWell(
-                          onTap: () => _selectDate(context),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.calendar_today),
-                                const SizedBox(width: 12),
-                                Text(
-                                  DateFormat('MMMM d, yyyy').format(_anniversaryDate),
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                                const Spacer(),
-                                const Icon(Icons.arrow_drop_down),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Emoji Selection Card
-                Card(
-                  elevation: 2,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  color: isDarkMode ? const Color(0xFF383844) : Colors.white,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Choose Emoji',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: isDarkMode ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: Wrap(
-                            alignment: WrapAlignment.spaceEvenly,
-                            spacing: 12,
-                            runSpacing: 12,
-                            children: _emojis.map((emoji) {
-                              return Material(
-                                color: Colors.transparent,
-                                borderRadius: BorderRadius.circular(12),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedEmoji = emoji;
-                                    });
-                                  },
-                                  child: Container(
-                                    width: 50,
-                                    height: 50,
-                                    decoration: BoxDecoration(
-                                      color: _selectedEmoji == emoji
-                                          ? themeService.primary.withOpacity(0.2)
-                                          : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: _selectedEmoji == emoji
-                                            ? themeService.primary
-                                            : Colors.grey.shade300,
-                                        width: 2,
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        emoji,
-                                        style: const TextStyle(fontSize: 24),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Save Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: Material(
-                    color: Provider.of<ThemeService>(context, listen: false).primary,
-                    borderRadius: BorderRadius.circular(16),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: _saveLoveCounter,
-                      child: const Center(
-                        child: Text(
-                          'Save Love Counter',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 80), // Add space for floating action button
-              ],
-            ),
-          ),
-        );
-      } else {
-        // Display View with live countdown
-        return RefreshIndicator(
-          onRefresh: _onRefresh,
-          color: Provider.of<ThemeService>(context, listen: false).primary,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                const SizedBox(height: 20),
-                
-                // Main Love Counter Card with Gradient Background
-                Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: Provider.of<ThemeService>(context, listen: false).isDarkMode 
-                        ? Provider.of<ThemeService>(context, listen: false).darkGradient
-                        : Provider.of<ThemeService>(context, listen: false).lightGradient,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Provider.of<ThemeService>(context, listen: false).primary.withOpacity(0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      children: [
-                        // Names with emoji
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              _loveCounter!.userName,
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text(
-                                _loveCounter!.emoji,
-                                style: const TextStyle(fontSize: 28),
-                              ),
-                            ),
-                            Text(
-                              _loveCounter!.partnerName,
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                        
-                        const SizedBox(height: 24),
-                        
-                        // Live countdown display
-                        _buildLiveCountdown(),
-                        
-                        const SizedBox(height: 16),
-                        
-                        // Anniversary date
-                        Text(
-                          'Since ${DateFormat('MMMM d, yyyy').format(_loveCounter!.anniversaryDate)}',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white.withOpacity(0.9),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(height: 32),
-                
-                // Milestones Section
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Milestones',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: isDarkMode ? Colors.white : Colors.black87,
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => MilestoneEditorScreen(
-                              loveCounter: _loveCounter!,
-                            ),
-                          ),
-                        ).then((_) => _loadLoveCounter());
-                      },
-                      icon: Icon(Icons.add, color: Provider.of<ThemeService>(context, listen: false).primary),
-                      label: Text(
-                        'Add',
-                        style: TextStyle(color: Provider.of<ThemeService>(context, listen: false).primary),
-                      ),
-                    ),
-                  ],
-                ),
-                
-                const SizedBox(height: 16),
-                
-                // Milestones List or Empty State
-                if (_loveCounter!.milestones.isEmpty)
-                  _buildEmptyMilestones()
-                else
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _loveCounter!.milestones.length,
-                    itemBuilder: (context, index) {
-                      final milestone = _loveCounter!.milestones[index];
-                      return _buildMilestoneCard(milestone);
-                    },
-                  ),
-                
-                const SizedBox(height: 80), // Add space for floating action button
-              ],
-            ),
-          ),
-        );
-      }
-    }
-
-    return PopScope(
-      canPop: !_isEditing,
-      onPopInvoked: (didPop) {
-        if (!didPop && _isEditing) {
-          // If we're in edit mode and the pop was prevented, exit edit mode
-          setState(() {
-            _isEditing = false;
-          });
-          // Reset the app bar
-          widget.onAppBarUpdate?.call(null, null);
-        }
-      },
-      child: Scaffold(
+    // If no love counter exists, show create message
+    if (_loveCounter == null) {
+      return Scaffold(
         backgroundColor: backgroundColor,
         body: SafeArea(
           child: SkeletonLoaderFixed(
             isLoading: skeletonService.isLoading,
-            child: buildContent(),
+            child: RefreshIndicator(
+              onRefresh: _onRefresh,
+              color: themeService.primary,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(24),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 100),
+                      Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade100,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.favorite_outline,
+                          size: 60,
+                          color: themeService.primary.withOpacity(0.7),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      Text(
+                        'Create Your Love Counter',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Track the beautiful journey with your loved one',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: isDarkMode ? Colors.white54 : Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: Material(
+                          color: themeService.primary,
+                          borderRadius: BorderRadius.circular(16),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const LoveCounterEditScreen(),
+                                ),
+                              );
+                              
+                              if (result == true) {
+                                _loadLoveCounter();
+                              }
+                            },
+                            child: const Center(
+                              child: Text(
+                                'Create Love Counter',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
-        // Add floating action button for editing
-        floatingActionButton: (_loveCounter != null && !_isEditing) 
-            ? FloatingActionButton(
-                onPressed: () {
-                  setState(() {
-                    _isEditing = true;
-                  });
-                  widget.onAppBarUpdate?.call('💕 Edit Love Counter', () {
-                    setState(() {
-                      _isEditing = false;
-                    });
-                    widget.onAppBarUpdate?.call(null, null);
-                  });
-                },
-                backgroundColor: Provider.of<ThemeService>(context, listen: false).primary,
-                child: const Icon(Icons.edit, color: Colors.white),
-              )
-            : null,
+      );
+    }
+
+    // Display View with live countdown
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      body: SafeArea(
+        child: SkeletonLoaderFixed(
+          isLoading: skeletonService.isLoading,
+          child: RefreshIndicator(
+            onRefresh: _onRefresh,
+            color: themeService.primary,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  const SizedBox(height: 20),
+                  
+                  // Main Love Counter Card with Gradient Background
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: isDarkMode 
+                          ? themeService.darkGradient
+                          : themeService.lightGradient,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: themeService.primary.withOpacity(0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        children: [
+                          // Names with emoji
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                _loveCounter!.userName,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                child: Text(
+                                  _loveCounter!.emoji,
+                                  style: const TextStyle(fontSize: 28),
+                                ),
+                              ),
+                              Text(
+                                _loveCounter!.partnerName,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          
+                          const SizedBox(height: 24),
+                          
+                          // Live countdown display
+                          _buildLiveCountdown(),
+                          
+                          const SizedBox(height: 16),
+                          
+                          // Anniversary date
+                          Text(
+                            'Since ${DateFormat('MMMM d, yyyy').format(_loveCounter!.anniversaryDate)}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 32),
+                  
+                  // Milestones Section
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Milestones',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MilestoneEditorScreen(
+                                loveCounter: _loveCounter!,
+                              ),
+                            ),
+                          ).then((_) => _loadLoveCounter());
+                        },
+                        icon: Icon(Icons.add, color: themeService.primary),
+                        label: Text(
+                          'Add',
+                          style: TextStyle(color: themeService.primary),
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Milestones List or Empty State
+                  if (_loveCounter!.milestones.isEmpty)
+                    _buildEmptyMilestones()
+                  else ...[
+                    // Hint text for milestone interaction
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        'Tap to edit • Long press for more options',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDarkMode ? Colors.white54 : Colors.grey.shade500,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _loveCounter!.milestones.length,
+                      itemBuilder: (context, index) {
+                        final milestone = _loveCounter!.milestones[index];
+                        return _buildMilestoneCard(milestone);
+                      },
+                    ),
+                  ],
+                  
+                  const SizedBox(height: 80), // Add space for floating action button
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      // Add floating action button for editing
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            colors: isDarkMode ? themeService.darkGradient : themeService.lightGradient,
+            radius: 1.0,
+          ),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: themeService.primary.withOpacity(0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: FloatingActionButton(
+          onPressed: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => LoveCounterEditScreen(
+                  existingLoveCounter: _loveCounter,
+                ),
+              ),
+            );
+            
+            if (result == true) {
+              _loadLoveCounter();
+            }
+          },
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: const Icon(Icons.edit, color: Colors.white),
+        ),
       ),
     );
   }
@@ -701,69 +513,67 @@ class _LoveCounterScreenState extends State<LoveCounterScreen> {
   Widget _buildEmptyMilestones() {
     final isDarkMode = Provider.of<ThemeService>(context).isDarkMode;
     
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 32),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                color: isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade100,
-                              shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade100,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.favorite_border,
+              size: 40,
+              color: Provider.of<ThemeService>(context, listen: false).primary.withOpacity(0.5),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No milestones yet',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Add your first milestone to celebrate special moments',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              color: isDarkMode ? Colors.white54 : Colors.grey.shade500,
+            ),
+          ),
+          const SizedBox(height: 24),
+          M3Button(
+            text: "Add First Milestone",
+            icon: Icons.add,
+            backgroundColor: Provider.of<ThemeService>(context, listen: false).primary,
+            foregroundColor: Colors.white,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MilestoneEditorScreen(
+                    loveCounter: _loveCounter!,
                   ),
-                ],
-                            ),
-                            child: Icon(
-                              Icons.favorite_border,
-                              size: 40,
-                color: Provider.of<ThemeService>(context, listen: false).primary.withOpacity(0.5),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No milestones yet',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Add your first milestone to celebrate special moments',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 16,
-                color: isDarkMode ? Colors.white54 : Colors.grey.shade500,
-                            ),
-                          ),
-            const SizedBox(height: 24),
-            M3Button(
-              text: "Add First Milestone",
-              icon: Icons.add,
-              backgroundColor: Provider.of<ThemeService>(context, listen: false).primary,
-              foregroundColor: Colors.white,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => MilestoneEditorScreen(
-                      loveCounter: _loveCounter!,
-                    ),
-                  ),
-                ).then((_) => _loadLoveCounter());
-              },
-                              ),
-                            ],
-                          ),
+                ),
+              ).then((_) => _loadLoveCounter());
+            },
+          ),
+        ],
       ),
     );
   }
@@ -771,113 +581,374 @@ class _LoveCounterScreenState extends State<LoveCounterScreen> {
   Widget _buildMilestoneCard(Milestone milestone) {
     final isDarkMode = Provider.of<ThemeService>(context).isDarkMode;
     
-    return M3Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      color: isDarkMode ? const Color(0xFF3E3E4E) : Colors.white,
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => MilestoneEditorScreen(
-              loveCounter: _loveCounter!,
-              existingMilestone: milestone,
-            ),
+      decoration: BoxDecoration(
+        color: isDarkMode ? const Color(0xFF3E3E4E) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
-        ).then((_) => _loadLoveCounter());
-      },
-      child: Row(
-        children: [
-          // Emoji circle
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: Provider.of<ThemeService>(context, listen: false).primary.withOpacity(0.15),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Provider.of<ThemeService>(context, listen: false).primary.withOpacity(0.3),
-                width: 1,
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MilestoneEditorScreen(
+                  loveCounter: _loveCounter!,
+                  existingMilestone: milestone,
+                ),
               ),
-            ),
-            child: Center(
-              child: Text(
-                milestone.emoji,
-                style: const TextStyle(fontSize: 24),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          // Milestone details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            ).then((_) => _loadLoveCounter());
+          },
+          onLongPress: () {
+            debugPrint('🔥 Long press detected on milestone: ${milestone.title}');
+            _showMilestoneOptions(milestone);
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
               children: [
-                Text(
-                  milestone.title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isDarkMode ? Colors.white : Colors.black87,
+                // Emoji circle
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Provider.of<ThemeService>(context, listen: false).primary.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Provider.of<ThemeService>(context, listen: false).primary.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      milestone.emoji,
+                      style: const TextStyle(fontSize: 24),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Provider.of<ThemeService>(context, listen: false).primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Provider.of<ThemeService>(context, listen: false).primary.withOpacity(0.2),
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        'Day ${milestone.dayCount}',
+                const SizedBox(width: 16),
+                // Milestone details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        milestone.title,
                         style: TextStyle(
-                          fontSize: 12,
-                          color: Provider.of<ThemeService>(context, listen: false).primary,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black87,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      DateFormat('MMM d, yyyy').format(milestone.date),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDarkMode ? Colors.white60 : Colors.grey.shade600,
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Provider.of<ThemeService>(context, listen: false).primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Provider.of<ThemeService>(context, listen: false).primary.withOpacity(0.2),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              'Day ${milestone.dayCount}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Provider.of<ThemeService>(context, listen: false).primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          if (milestone.description.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                milestone.description,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDarkMode ? Colors.white54 : Colors.grey.shade600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
+                    ],
+                  ),
+                ),
+                // More options icon (indicates long press)
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: isDarkMode 
+                      ? Colors.white.withOpacity(0.1) 
+                      : Provider.of<ThemeService>(context, listen: false).primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Icons.more_vert,
+                      size: 16,
+                      color: isDarkMode 
+                        ? Colors.white70 
+                        : Provider.of<ThemeService>(context, listen: false).primary,
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
           ),
-          // Arrow icon with circle background for glossy effect
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: isDarkMode 
-                ? Colors.white.withOpacity(0.1) 
-                : Provider.of<ThemeService>(context, listen: false).primary.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Icon(
-                Icons.arrow_forward_ios,
-                size: 12,
-                color: isDarkMode 
-                  ? Colors.white70 
-                  : Provider.of<ThemeService>(context, listen: false).primary,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
-  } 
+  }
+
+  void _showMilestoneOptions(Milestone milestone) {
+    debugPrint('🎯 Showing milestone options for: ${milestone.title}');
+    final isDarkMode = Provider.of<ThemeService>(context, listen: false).isDarkMode;
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: isDarkMode ? const Color(0xFF2D2D3A) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              // Milestone info
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Text(
+                      milestone.emoji,
+                      style: const TextStyle(fontSize: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            milestone.title,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: isDarkMode ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          Text(
+                            'Day ${milestone.dayCount}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Action buttons
+              ListTile(
+                leading: Icon(
+                  Icons.edit,
+                  color: Provider.of<ThemeService>(context, listen: false).primary,
+                ),
+                title: Text(
+                  'Edit Milestone',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black87,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MilestoneEditorScreen(
+                        loveCounter: _loveCounter!,
+                        existingMilestone: milestone,
+                      ),
+                    ),
+                  ).then((_) => _loadLoveCounter());
+                },
+              ),
+              
+              ListTile(
+                leading: const Icon(
+                  Icons.delete,
+                  color: Colors.red,
+                ),
+                title: Text(
+                  'Delete Milestone',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black87,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmDeleteMilestone(milestone);
+                },
+              ),
+              
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmDeleteMilestone(Milestone milestone) async {
+    final isDarkMode = Provider.of<ThemeService>(context, listen: false).isDarkMode;
+    
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: isDarkMode ? const Color(0xFF383844) : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Delete Milestone',
+            style: TextStyle(
+              color: isDarkMode ? Colors.white : Colors.black87,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: RichText(
+            text: TextSpan(
+              style: TextStyle(
+                color: isDarkMode ? Colors.white70 : Colors.black54,
+                fontSize: 16,
+              ),
+              children: [
+                const TextSpan(text: 'Are you sure you want to delete '),
+                TextSpan(
+                  text: '"${milestone.title}"',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const TextSpan(text: '? This action cannot be undone.'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.red.shade600,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Delete',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete == true) {
+      await _deleteMilestone(milestone);
+    }
+  }
+
+  Future<void> _deleteMilestone(Milestone milestone) async {
+    final skeletonService = Provider.of<SkeletonService>(context, listen: false);
+    
+    await skeletonService.withQuickToggle(() async {
+      try {
+        final dataService = Provider.of<DataService>(context, listen: false);
+        
+        // Get current milestones and remove the selected one
+        final currentMilestones = List<Milestone>.from(_loveCounter!.milestones);
+        currentMilestones.removeWhere((m) => m.id == milestone.id);
+        
+        // Update the love counter with the new milestones list
+        final updatedLoveCounter = _loveCounter!.copyWith(
+          milestones: currentMilestones,
+        );
+        
+        await dataService.updateLoveCounter(updatedLoveCounter);
+        
+        // Reload the love counter to reflect changes
+        await _loadLoveCounter();
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Milestone "${milestone.title}" deleted successfully'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting milestone: $e'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    });
+  }
 }

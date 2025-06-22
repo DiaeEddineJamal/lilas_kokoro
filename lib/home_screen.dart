@@ -117,9 +117,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           onPressed: () {
             // You can add conversation management functionality here
             // For now, just show a placeholder
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Conversations menu')),
-            );
+                    ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Conversations menu'),
+            backgroundColor: Colors.blue,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
           },
           icon: const Icon(
             Icons.menu,
@@ -193,32 +197,49 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final themeService = Provider.of<ThemeService>(context);
     final isDarkMode = themeService.isDarkMode;
 
-    final fabColor = isDarkMode ? themeService.selectedPalette.deep : themeService.primary;
+    Widget buildGradientFAB(VoidCallback onPressed, IconData icon) {
+      return Container(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            colors: isDarkMode ? themeService.darkGradient : themeService.lightGradient,
+            radius: 1.0,
+          ),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: themeService.primary.withOpacity(0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: FloatingActionButton(
+          onPressed: onPressed,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Icon(
+            icon,
+            color: Colors.white,
+            size: 28,
+          ),
+        ),
+      );
+    }
 
     switch (index) {
       case 1: // Reminders
-        return FloatingActionButton(
-          onPressed: () {
+        return buildGradientFAB(
+          () {
             Navigator.pushNamed(context, '/reminder_editor');
           },
-          backgroundColor: fabColor,
-          child: const Icon(
-            Icons.add_rounded,
-            color: Colors.white,
-            size: 28,
-          ),
+          Icons.add_rounded,
         );
       case 3: // Love Counter
-        return FloatingActionButton(
-          onPressed: () {
+        return buildGradientFAB(
+          () {
             // Handle love counter specific action
           },
-          backgroundColor: fabColor,
-          child: const Icon(
-            Icons.favorite_rounded,
-            color: Colors.white,
-            size: 28,
-          ),
+          Icons.favorite_rounded,
         );
       default:
         return null;

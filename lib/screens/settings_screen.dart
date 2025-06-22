@@ -5,7 +5,7 @@ import '../services/theme_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/app_header.dart';
 import '../widgets/m3_card.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/m3_button.dart';
@@ -125,6 +125,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
                 : 'Notifications disabled - reminder pop-ups are blocked'
             ),
             backgroundColor: notificationsEnabled ? Colors.green : Colors.orange,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -168,9 +169,10 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not open GitHub profile'),
+            SnackBar(
+              content: const Text('Could not open GitHub profile'),
               backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
             ),
           );
         }
@@ -181,6 +183,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
           SnackBar(
             content: Text('Error opening GitHub profile: $e'),
             backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -362,15 +365,16 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
                                         return GestureDetector(
                                           onTap: () async {
                                             await themeService.changeColorPalette(index);
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(
-                                                  content: Text('Changed to ${palette.name} palette'),
-                                                  backgroundColor: palette.primary,
-                                                  duration: const Duration(seconds: 2),
-                                                ),
-                                              );
-                                            }
+                                                                        if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Changed to ${palette.name} palette'),
+                                  backgroundColor: palette.primary,
+                                  behavior: SnackBarBehavior.floating,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
                                           },
                                           child: AnimatedContainer(
                                             duration: const Duration(milliseconds: 200),
@@ -400,26 +404,31 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
                                             ),
                                             child: Column(
                                               mainAxisAlignment: MainAxisAlignment.center,
+                                              crossAxisAlignment: CrossAxisAlignment.center,
                                               children: [
                                                 Text(
                                                   palette.icon,
                                                   style: const TextStyle(fontSize: 20),
+                                                  textAlign: TextAlign.center,
                                                 ),
                                                 const SizedBox(height: 4),
-                                                Text(
-                                                  palette.name.split(' ')[0], // First word only
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w600,
-                                                    shadows: [
-                                                      Shadow(
-                                                        color: Colors.black26,
-                                                        blurRadius: 2,
-                                                      ),
-                                                    ],
+                                                SizedBox(
+                                                  width: double.infinity,
+                                                  child: Text(
+                                                    palette.name.split(' ')[0], // First word only
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w600,
+                                                      shadows: [
+                                                        Shadow(
+                                                          color: Colors.black26,
+                                                          blurRadius: 2,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    textAlign: TextAlign.center,
                                                   ),
-                                                  textAlign: TextAlign.center,
                                                 ),
                                               ],
                                             ),

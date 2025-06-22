@@ -152,30 +152,35 @@ class _ThemeSelectionScreenState extends State<ThemeSelectionScreen> with Ticker
                                     padding: const EdgeInsets.all(16),
                                     child: Column(
                                       mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
                                         // Emoji
                                         Text(
                                           palette.icon,
                                           style: const TextStyle(fontSize: 40),
+                                          textAlign: TextAlign.center,
                                         ),
                                         
                                         const SizedBox(height: 12),
                                         
                                         // Name
-                                        Text(
-                                          palette.name,
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                            shadows: [
-                                              Shadow(
-                                                offset: Offset(0, 1),
-                                                blurRadius: 2,
-                                                color: Colors.black26,
-                                              ),
-                                            ],
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: Text(
+                                            palette.name,
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                              shadows: [
+                                                Shadow(
+                                                  offset: Offset(0, 1),
+                                                  blurRadius: 2,
+                                                  color: Colors.black26,
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ],

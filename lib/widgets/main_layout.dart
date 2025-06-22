@@ -12,7 +12,9 @@ import 'gradient_bottom_nav.dart';
 
 /// Main layout widget with gradient navigation
 class MainLayout extends StatefulWidget {
-  const MainLayout({Key? key}) : super(key: key);
+  final int? initialTab;
+  
+  const MainLayout({Key? key, this.initialTab}) : super(key: key);
 
   @override
   State<MainLayout> createState() => _MainLayoutState();
@@ -20,8 +22,6 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   int _currentIndex = 0;
-  String? _customTitle;
-  VoidCallback? _customBackAction;
 
   final List<String> _titles = [
     '🏠 Dashboard',
@@ -62,16 +62,16 @@ class _MainLayoutState extends State<MainLayout> {
   void _onItemTapped(int index) {
     setState(() {
       _currentIndex = index;
-      _customTitle = null;
-      _customBackAction = null;
     });
   }
 
-  void _updateAppBar(String? title, VoidCallback? backAction) {
-    setState(() {
-      _customTitle = title;
-      _customBackAction = backAction;
-    });
+  @override
+  void initState() {
+    super.initState();
+    // Set initial tab if provided (e.g., from notification navigation)
+    if (widget.initialTab != null) {
+      _currentIndex = widget.initialTab!;
+    }
   }
 
   @override
@@ -83,7 +83,7 @@ class _MainLayoutState extends State<MainLayout> {
         final List<Widget> _screens = [
           DashboardTab(onTabChange: _onItemTapped),
           const RemindersScreen(),
-          LoveCounterScreen(onAppBarUpdate: _updateAppBar),
+          const LoveCounterScreen(),
           const AICompanionScreen(),
           const SettingsScreen(),
         ];
@@ -96,14 +96,7 @@ class _MainLayoutState extends State<MainLayout> {
           extendBodyBehindAppBar: isAICompanionScreen,
           extendBody: isAICompanionScreen, // This extends behind bottom nav bar
           appBar: GradientAppBar(
-            title: _customTitle ?? _titles[_currentIndex],
-            leading: _customBackAction != null 
-                ? IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: _customBackAction,
-                  )
-                : null,
-            automaticallyImplyLeading: _customBackAction == null,
+            title: _titles[_currentIndex],
           ),
           body: Container(
             decoration: BoxDecoration(
@@ -125,7 +118,6 @@ class _MainLayoutState extends State<MainLayout> {
             currentIndex: _currentIndex,
             onTap: _onItemTapped,
             items: _bottomNavItems,
-            // Keep original styling - no transparency changes
           ),
         );
       },

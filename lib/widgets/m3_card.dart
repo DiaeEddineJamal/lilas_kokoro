@@ -10,6 +10,7 @@ class M3Card extends StatelessWidget {
   final Color? color;
   final BorderRadiusGeometry? borderRadius;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   const M3Card({
     super.key,
@@ -20,6 +21,7 @@ class M3Card extends StatelessWidget {
     this.color,
     this.borderRadius,
     this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -62,6 +64,7 @@ class M3Card extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onTap,
+            onLongPress: onLongPress,
             splashColor: colorScheme.primary.withOpacity(0.1),
             highlightColor: colorScheme.primary.withOpacity(0.05),
             borderRadius: customRadius is BorderRadius 

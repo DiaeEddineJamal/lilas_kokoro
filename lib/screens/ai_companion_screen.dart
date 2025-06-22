@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:flutter_highlight/flutter_highlight.dart';
-import 'package:flutter_highlight/themes/vs.dart';
-import 'package:flutter_highlight/themes/vs2015.dart';
-import 'package:markdown/markdown.dart' as md;
+
 import '../models/chat_message_model.dart';
 import '../services/ai_companion_service.dart';
 import '../services/theme_service.dart';
@@ -14,7 +10,6 @@ import '../widgets/app_header.dart';
 import '../widgets/main_layout.dart';
 import 'conversation_list_screen.dart';
 import '../widgets/m3_button.dart';
-import '../widgets/m3_card.dart';
 import '../widgets/chat_message_bubble.dart';
 import 'dart:async';
 import 'dart:math';
@@ -284,7 +279,11 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
         
         // Show error snackbar
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error sending message: $e')),
+          SnackBar(
+            content: Text('Error sending message: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -446,15 +445,23 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
       
       // Show confirmation
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Conversation cleared')),
-        );
+                    ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Conversation cleared'),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error clearing conversation: $e')),
-        );
+                    ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error clearing conversation: $e'),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
       }
     } finally {
       setState(() {
@@ -487,15 +494,23 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
       
       // Show confirmation
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('All conversations cleared')),
-        );
+                    ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('All conversations cleared'),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error clearing conversations: $e')),
-        );
+                    ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error clearing conversations: $e'),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
       }
     } finally {
       setState(() {
@@ -533,15 +548,23 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
       
       // Show confirmation
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Conversation deleted')),
-        );
+                    ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Conversation deleted'),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting conversation: $e')),
-        );
+                    ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error deleting conversation: $e'),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
       }
     } finally {
       setState(() {
@@ -1196,12 +1219,32 @@ class ConversationsDialog extends StatelessWidget {
                                 showDialog(
                                   context: context,
                                   builder: (context) => AlertDialog(
-                                    title: const Text('Delete Conversation'),
-                                    content: const Text('Are you sure you want to delete this conversation? This action cannot be undone.'),
+                                    backgroundColor: isDarkMode ? const Color(0xFF383844) : Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    title: Text(
+                                      'Delete Conversation',
+                                      style: TextStyle(
+                                        color: isDarkMode ? Colors.white : Colors.black87,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    content: Text(
+                                      'Are you sure you want to delete this conversation? This action cannot be undone.',
+                                      style: TextStyle(
+                                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                                      ),
+                                    ),
                                     actions: [
                                       TextButton(
                                         onPressed: () => Navigator.pop(context),
-                                        child: const Text('CANCEL'),
+                                        child: Text(
+                                          'CANCEL',
+                                          style: TextStyle(
+                                            color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                          ),
+                                        ),
                                       ),
                                       TextButton(
                                         onPressed: () {
@@ -1211,7 +1254,19 @@ class ConversationsDialog extends StatelessWidget {
                                             'conversation_id': conversation.id,
                                           });
                                         },
-                                        child: const Text('DELETE'),
+                                        style: TextButton.styleFrom(
+                                          backgroundColor: Colors.red.shade600,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'DELETE',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -1278,12 +1333,32 @@ class ConversationsDialog extends StatelessWidget {
                       showDialog(
                   context: context,
                   builder: (context) => AlertDialog(
-                          title: const Text('Clear All Conversations'),
-                          content: const Text('Are you sure you want to delete all conversations? This action cannot be undone.'),
+                          backgroundColor: isDarkMode ? const Color(0xFF383844) : Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          title: Text(
+                            'Clear All Conversations',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white : Colors.black87,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          content: Text(
+                            'Are you sure you want to delete all conversations? This action cannot be undone.',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white70 : Colors.black54,
+                            ),
+                          ),
                     actions: [
                       TextButton(
                               onPressed: () => Navigator.pop(context),
-                        child: const Text('CANCEL'),
+                        child: Text(
+                                'CANCEL',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                ),
+                              ),
                       ),
                       TextButton(
                               onPressed: () {
@@ -1292,7 +1367,19 @@ class ConversationsDialog extends StatelessWidget {
                                   'action': 'clear_all_conversations',
                                 });
                               },
-                              child: const Text('CLEAR ALL'),
+                              style: TextButton.styleFrom(
+                                backgroundColor: Colors.red.shade600,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text(
+                                'CLEAR ALL',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ],
                   ),
@@ -1567,115 +1654,12 @@ class _AnimatedMessageState extends State<AnimatedMessage> with SingleTickerProv
                                   fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
                                 ),
                               )
-                            : MarkdownBody(
-                                data: message.text,
-                                selectable: true,
-                                builders: {
-                                  'code': SyntaxHighlightBuilder(isDarkMode: isDarkMode),
-                                },
-                                styleSheet: MarkdownStyleSheet(
-                                  p: TextStyle(
-                                    color: textColor,
-                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
-                                    height: 1.4,
-                                  ),
-                                  a: TextStyle(
-                                    color: textColor, // Link color
-                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
-                                  ),
-                                  tableHead: TextStyle(
-                                    color: textColor, // Table header color
-                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  tableBody: TextStyle(
-                                    color: textColor, // Table body color
-                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
-                                  ),
-                                  strong: TextStyle(
-                                    color: textColor,
-                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1.4,
-                                  ),
-                                  em: TextStyle(
-                                    color: textColor,
-                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
-                                    fontStyle: FontStyle.italic,
-                                    height: 1.4,
-                                  ),
-                                  code: TextStyle(
-                                    color: isDarkMode 
-                                        ? const Color(0xFF9CDCFE)  // VS Code blue for variables
-                                        : const Color(0xFF0451A5), // VS Code dark blue
-                                    fontSize: widget.isKeyboardVisible ? 12.0 : 14.0,
-                                    fontFamily: 'monospace',
-                                    backgroundColor: isDarkMode 
-                                        ? const Color(0xFF1E1E1E)  // VS Code dark background
-                                        : const Color(0xFFF8F8F8), // VS Code light background
-                                  ),
-                                  codeblockDecoration: const BoxDecoration(
-                                    color: Colors.transparent, // Remove background to prevent double containers
-                                    borderRadius: BorderRadius.zero, // Remove border radius
-                                  ),
-                                  codeblockPadding: const EdgeInsets.all(12),
-                                  listBullet: TextStyle(
-                                    color: textColor,
-                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
-                                    height: 1.4,
-                                  ),
-                                  listIndent: 20,
-                                  h1: TextStyle(
-                                    color: textColor, // Use textColor instead of hardcoded dark color
-                                    fontSize: widget.isKeyboardVisible ? 18.0 : 20.0,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1.3,
-                                  ),
-                                  h2: TextStyle(
-                                    color: textColor, // Use textColor instead of hardcoded dark color
-                                    fontSize: widget.isKeyboardVisible ? 16.0 : 18.0,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1.3,
-                                  ),
-                                  h3: TextStyle(
-                                    color: textColor, // Use textColor instead of hardcoded dark color
-                                    fontSize: widget.isKeyboardVisible ? 15.0 : 17.0,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.3,
-                                  ),
-                                  h4: TextStyle(
-                                    color: textColor,
-                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.3,
-                                  ),
-                                  h5: TextStyle(
-                                    color: textColor,
-                                    fontSize: widget.isKeyboardVisible ? 13.0 : 15.0,
-                                    fontWeight: FontWeight.w500,
-                                    height: 1.3,
-                                  ),
-                                  h6: TextStyle(
-                                    color: textColor,
-                                    fontSize: widget.isKeyboardVisible ? 12.0 : 14.0,
-                                    fontWeight: FontWeight.w500,
-                                    height: 1.3,
-                                  ),
-                                  blockquote: TextStyle(
-                                    color: textColor.withOpacity(0.8),
-                                    fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
-                                    fontStyle: FontStyle.italic,
-                                    height: 1.4,
-                                  ),
-                                  blockquoteDecoration: BoxDecoration(
-                                    border: Border(
-                                      left: BorderSide(
-                                        color: const Color(0xFFD1D1D6),
-                                        width: 3,
-                                      ),
-                                    ),
-                                  ),
-                                  blockquotePadding: const EdgeInsets.only(left: 12),
+                            : SelectableText(
+                                message.text,
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: widget.isKeyboardVisible ? 14.0 : 16.0,
+                                  height: 1.4,
                                 ),
                               ),
                   ),
@@ -1806,123 +1790,5 @@ class _KeyboardVisibilityObserver extends WidgetsBindingObserver {
     final bottomInset = View.of(_state.context).viewInsets.bottom;
     final isKeyboardVisible = bottomInset > 0.0;
     _state.updateKeyboardVisibility(isKeyboardVisible, bottomInset);
-  }
-}
-
-// Custom syntax highlight builder for code blocks with VS Code colors
-class SyntaxHighlightBuilder extends MarkdownElementBuilder {
-  final bool isDarkMode;
-  
-  SyntaxHighlightBuilder({required this.isDarkMode});
-  
-  @override
-  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
-    final String language = element.attributes['class']?.replaceFirst('language-', '') ?? 'text';
-    final String code = element.textContent;
-    
-    if (element.tag == 'code') {
-      // Check if it's likely a multi-line code block (longer text or contains newlines)
-      bool isCodeBlock = code.contains('\n') || code.length > 30;
-      
-      if (isCodeBlock) {
-        // Multi-line code block with syntax highlighting
-        return Container(
-          width: double.infinity,
-          margin: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Stack(
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDarkMode 
-                      ? const Color(0xFF1C1C1E)  // Darker background for dark mode
-                      : const Color(0xFFF8F8F8), // Light background for light mode
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: isDarkMode 
-                        ? const Color(0xFF3C3C3C)  // Dark border for dark mode
-                        : const Color(0xFFE1E4E8), // Light border for light mode
-                    width: 1,
-                  ),
-                ),
-                child: HighlightView(
-                  code,
-                  language: _getLanguage(language),
-                  theme: isDarkMode ? vs2015Theme : vsTheme, // Use appropriate theme
-                  padding: EdgeInsets.zero,
-                  textStyle: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 14,
-                    color: isDarkMode ? Colors.white : Colors.black87, // Ensure text is visible
-                  ),
-                ),
-              ),
-              // Copy button
-              Positioned(
-                top: 8,
-                right: 8,
-                child: GestureDetector(
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: code));
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Icon(
-                      Icons.copy,
-                      size: 16,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      } else {
-        // Inline code with syntax highlighting
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-          decoration: BoxDecoration(
-            color: isDarkMode 
-                ? const Color(0xFF1C1C1E)  // Darker background for dark mode
-                : const Color(0xFFF8F8F8), // Light background for light mode
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: HighlightView(
-            code,
-            language: _getLanguage(language),
-            theme: isDarkMode ? vs2015Theme : vsTheme, // Use appropriate theme
-            padding: EdgeInsets.zero,
-            textStyle: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 14,
-              color: isDarkMode ? Colors.white : Colors.black87, // Ensure text is visible
-            ),
-          ),
-        );
-      }
-    }
-    
-    return null;
-  }
-  
-  String _getLanguage(String lang) {
-    // Map common language names to highlight.js supported names
-    final languageMap = {
-      'js': 'javascript',
-      'ts': 'typescript',
-      'py': 'python',
-      'rb': 'ruby',
-      'sh': 'bash',
-      'yml': 'yaml',
-      'md': 'markdown',
-    };
-    
-    return languageMap[lang.toLowerCase()] ?? lang.toLowerCase();
   }
 }

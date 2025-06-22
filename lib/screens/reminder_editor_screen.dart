@@ -72,6 +72,9 @@ class _ReminderEditorScreenState extends State<ReminderEditorScreen> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
+    final themeService = Provider.of<ThemeService>(context, listen: false);
+    final isDarkMode = themeService.isDarkMode;
+    
     // Ensure initialDate is not before firstDate
     final now = DateTime.now();
     final firstDate = DateTime(now.year, now.month, now.day);
@@ -84,11 +87,25 @@ class _ReminderEditorScreenState extends State<ReminderEditorScreen> {
       lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
       builder: (BuildContext context, Widget? child) {
         return Theme(
-          data: ThemeData.light().copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFFFF85A2),
-            ),
-          ),
+          data: isDarkMode 
+            ? ThemeData.dark().copyWith(
+                colorScheme: ColorScheme.dark(
+                  primary: themeService.primary,
+                  onPrimary: Colors.white,
+                  surface: const Color(0xFF383844),
+                  onSurface: Colors.white,
+                ),
+                dialogBackgroundColor: const Color(0xFF383844),
+              )
+            : ThemeData.light().copyWith(
+                colorScheme: ColorScheme.light(
+                  primary: themeService.primary,
+                  onPrimary: Colors.white,
+                  surface: Colors.white,
+                  onSurface: Colors.black87,
+                ),
+                dialogBackgroundColor: Colors.white,
+              ),
           child: child!,
         );
       },
@@ -101,16 +118,47 @@ class _ReminderEditorScreenState extends State<ReminderEditorScreen> {
   }
 
   Future<void> _selectTime(BuildContext context) async {
+    final themeService = Provider.of<ThemeService>(context, listen: false);
+    final isDarkMode = themeService.isDarkMode;
+    
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: _selectedTime,
       builder: (BuildContext context, Widget? child) {
         return Theme(
-          data: ThemeData.light().copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFFFF85A2),
-            ),
-          ),
+          data: isDarkMode 
+            ? ThemeData.dark().copyWith(
+                colorScheme: ColorScheme.dark(
+                  primary: themeService.primary,
+                  onPrimary: Colors.white,
+                  surface: const Color(0xFF383844),
+                  onSurface: Colors.white,
+                ),
+                dialogBackgroundColor: const Color(0xFF383844),
+                timePickerTheme: TimePickerThemeData(
+                  backgroundColor: const Color(0xFF383844),
+                  hourMinuteTextColor: Colors.white,
+                  dayPeriodTextColor: Colors.white,
+                  dialHandColor: themeService.primary,
+                  dialTextColor: Colors.white,
+                ),
+              )
+            : ThemeData.light().copyWith(
+                colorScheme: ColorScheme.light(
+                  primary: themeService.primary,
+                  onPrimary: Colors.white,
+                  surface: Colors.white,
+                  onSurface: Colors.black87,
+                ),
+                dialogBackgroundColor: Colors.white,
+                timePickerTheme: TimePickerThemeData(
+                  backgroundColor: Colors.white,
+                  hourMinuteTextColor: Colors.black87,
+                  dayPeriodTextColor: Colors.black87,
+                  dialHandColor: themeService.primary,
+                  dialTextColor: Colors.black87,
+                ),
+              ),
           child: child!,
         );
       },
@@ -177,7 +225,11 @@ class _ReminderEditorScreenState extends State<ReminderEditorScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving reminder: $e')),
+          SnackBar(
+            content: Text('Error saving reminder: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
@@ -684,23 +736,40 @@ class _ReminderEditorScreenState extends State<ReminderEditorScreen> {
                 SizedBox(
                   width: double.infinity,
                   height: 50,
-                  child: Material(
-                    color: primaryColor,
-                    borderRadius: BorderRadius.circular(16),
-                    child: InkWell(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: isDarkMode ? themeService.darkGradient : themeService.lightGradient,
+                      ),
                       borderRadius: BorderRadius.circular(16),
-                      onTap: _isSaving ? null : _saveReminder,
-                      child: Center(
-                        child: _isSaving
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : Text(
-                                'Save Reminder',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withOpacity(0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: _isSaving ? null : _saveReminder,
+                        child: Center(
+                          child: _isSaving
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : Text(
+                                  'Save Reminder',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
                                 ),
-                              ),
+                        ),
                       ),
                     ),
                   ),

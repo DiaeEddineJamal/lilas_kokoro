@@ -12,6 +12,7 @@ import 'screens/onboarding_screen.dart';
 import 'screens/permissions_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/profile_edit_screen.dart';
+import 'screens/splash_screen.dart';
 import 'services/theme_service.dart';
 import 'services/data_service.dart';
 import 'services/notification_service.dart';
@@ -81,9 +82,14 @@ void main() async {
   final aiCompanionService = AICompanionService();
   await aiCompanionService.initialize();
   
-  // Initialize ThemeService
+  // Initialize ThemeService FIRST to prevent gradient flashing
   final themeService = ThemeService();
   await themeService.initialize();
+  debugPrint('✅ ThemeService initialized with palette: ${themeService.selectedPalette.name}');
+  
+  // Pre-warm theme colors for splash screen
+  await themeService.preWarmColors();
+  debugPrint('✅ Theme colors pre-warmed for splash screen');
   
   // Initialize UserModel
   final userModel = UserModel();
@@ -170,11 +176,17 @@ Future<void> _preloadFonts() async {
 // Function to create GoRouter configuration
 GoRouter createGoRouter(NavigationStateService navigationStateService) {
   return GoRouter(
-    initialLocation: '/', // Start at the logical root
+    navigatorKey: NavigationStateService.navigatorKey, // Add global navigator key for notifications
+    initialLocation: '/splash', // Start with splash screen
     debugLogDiagnostics: true, // Enable console logging for router actions
     refreshListenable: navigationStateService, // Re-evaluate redirects when nav state changes
     redirect: (BuildContext context, GoRouterState state) async {
       final String location = state.matchedLocation;
+      
+      // Always allow splash screen to show
+      if (location == '/splash') {
+        return null;
+      }
       
       // Wait for initialization if not ready yet
       if (!navigationStateService.isInitialized) {
@@ -228,6 +240,10 @@ GoRouter createGoRouter(NavigationStateService navigationStateService) {
     },
     routes: [
       GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
         path: '/onboarding',
         builder: (context, state) => const OnboardingScreen(),
       ),
@@ -237,9 +253,12 @@ GoRouter createGoRouter(NavigationStateService navigationStateService) {
       ),
       GoRoute(
         path: '/',
-        builder: (context, state) => const MainLayout(), // Main app layout is the root
-        // Add nested routes if MainLayout uses a ShellRoute or similar
-        // For simple cases, separate routes might be fine
+        builder: (context, state) {
+          // Extract the initialTab from the 'extra' parameter
+          final extra = state.extra as Map<String, dynamic>?;
+          final initialTab = extra?['initialTab'] as int?;
+          return MainLayout(initialTab: initialTab);
+        },
       ),
       GoRoute(
         path: '/settings', // Example: Assuming settings is pushed on top

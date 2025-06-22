@@ -7,10 +7,12 @@ import 'screens/reminders_screen.dart';
 import 'screens/love_counter_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/profile_edit_screen.dart';
+import 'screens/splash_screen.dart';
 import 'widgets/main_layout.dart';
 
 // Define route paths as constants
 class Routes {
+  static const String splash = '/splash';
   static const String home = '/';
   static const String onboarding = '/onboarding';
   static const String permissions = '/permissions';
@@ -106,6 +108,13 @@ enum TransitionType {
 class AppRoutes {
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case Routes.splash:
+        return SmoothPageRoute(
+          page: const SplashScreen(),
+          transitionType: TransitionType.fade,
+          settings: settings,
+        );
+        
       case Routes.onboarding:
         return SmoothPageRoute(
           page: const OnboardingScreen(),
@@ -121,8 +130,10 @@ class AppRoutes {
         );
 
       case Routes.dashboard:
+        final args = settings.arguments as Map<String, dynamic>?;
+        final initialTab = args?['initialTab'] as int?;
         return SmoothPageRoute(
-          page: const MainLayout(),
+          page: MainLayout(initialTab: initialTab),
           transitionType: TransitionType.rightToLeft,
           settings: settings,
         );
@@ -150,8 +161,10 @@ class AppRoutes {
         );
 
       case Routes.settings:
+        final args = settings.arguments as Map<String, dynamic>?;
+        final initialTab = args?['initialTab'] as int?;
         return SmoothPageRoute(
-          page: const MainLayout(),
+          page: MainLayout(initialTab: initialTab),
           transitionType: TransitionType.rightToLeft,
           settings: settings,
         );
@@ -165,8 +178,10 @@ class AppRoutes {
         
       case Routes.home:
       default:
+        final args = settings.arguments as Map<String, dynamic>?;
+        final initialTab = args?['initialTab'] as int?;
         return SmoothPageRoute(
-          page: const MainLayout(),
+          page: MainLayout(initialTab: initialTab),
           transitionType: TransitionType.fade,
           settings: settings,
         );

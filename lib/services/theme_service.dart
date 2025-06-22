@@ -35,88 +35,111 @@ class ThemeService extends ChangeNotifier {
     ColorPalette(
       name: 'Rose Garden',
       icon: '🌹',
-      primary: Color(0xFFFF85A2),
-      secondary: Color(0xFFFF6B94),
-      accent: Color(0xFFFF94B3),
-      deep: Color(0xFF9E1A5A),
-      lightGradient: [Color(0xFFFF85A2), Color(0xFFFF6B94)],
-      darkGradient: [Color(0xFFFF6B94), Color(0xFF9E1A5A)],
+      primary: Color(0xFFFF69B4),
+      secondary: Color(0xFFFF1493),
+      accent: Color(0xFF87CEEB),
+      deep: Color(0xFFDC143C),
+      lightGradient: [Color(0xFFFF69B4), Color(0xFF87CEEB)], // Hot pink to sky blue
+      darkGradient: [Color(0xFFFF1493), Color(0xFF4682B4)], // Deep pink to steel blue
     ),
     ColorPalette(
       name: 'Ocean Breeze',
       icon: '🌊',
       primary: Color(0xFF4A9EFF),
       secondary: Color(0xFF2E86FF),
-      accent: Color(0xFF66B3FF),
+      accent: Color(0xFF00CED1),
       deep: Color(0xFF1B5AA0),
-      lightGradient: [Color(0xFF4A9EFF), Color(0xFF2E86FF)],
-      darkGradient: [Color(0xFF2E86FF), Color(0xFF1B5AA0)],
+      lightGradient: [Color(0xFF4A9EFF), Color(0xFF00CED1)], // Blue to dark turquoise
+      darkGradient: [Color(0xFF2E86FF), Color(0xFF008B8B)], // Darker blue to dark cyan
     ),
     ColorPalette(
       name: 'Forest Trail',
       icon: '🌲',
       primary: Color(0xFF4CAF50),
       secondary: Color(0xFF45A049),
-      accent: Color(0xFF66BB6A),
+      accent: Color(0xFF90EE90),
       deep: Color(0xFF2E7D32),
-      lightGradient: [Color(0xFF4CAF50), Color(0xFF45A049)],
-      darkGradient: [Color(0xFF45A049), Color(0xFF2E7D32)],
+      lightGradient: [Color(0xFF4CAF50), Color(0xFF90EE90)], // Green to light green
+      darkGradient: [Color(0xFF45A049), Color(0xFF228B22)], // Forest green to dark green
     ),
     ColorPalette(
-      name: 'Sunset Glow',
-      icon: '🌅',
-      primary: Color(0xFFFF6B35),
-      secondary: Color(0xFFFF5722),
-      accent: Color(0xFFFF8A65),
-      deep: Color(0xFFD84315),
-      lightGradient: [Color(0xFFFF6B35), Color(0xFFFF5722)],
-      darkGradient: [Color(0xFFFF5722), Color(0xFFD84315)],
+      name: 'Aurora Dream',
+      icon: '🌌',
+      primary: Color(0xFF7B68EE), // Medium slate blue - softer and more comfortable
+      secondary: Color(0xFF9370DB), // Medium purple
+      accent: Color(0xFFDDA0DD), // Plum - gentle and pleasing
+      deep: Color(0xFF6A5ACD), // Slate blue
+      lightGradient: [Color(0xFF7B68EE), Color(0xFFDDA0DD)], // Medium slate blue to plum
+      darkGradient: [Color(0xFF6A5ACD), Color(0xFF9370DB)], // Slate blue to medium purple
     ),
     ColorPalette(
       name: 'Royal Purple',
       icon: '👑',
       primary: Color(0xFF9C27B0),
       secondary: Color(0xFF8E24AA),
-      accent: Color(0xFFBA68C8),
+      accent: Color(0xFFDDA0DD),
       deep: Color(0xFF6A1B9A),
-      lightGradient: [Color(0xFF9C27B0), Color(0xFF8E24AA)],
-      darkGradient: [Color(0xFF8E24AA), Color(0xFF6A1B9A)],
+      lightGradient: [Color(0xFF9C27B0), Color(0xFFDDA0DD)], // Purple to plum
+      darkGradient: [Color(0xFF8E24AA), Color(0xFF8B008B)], // Dark magenta to dark magenta
     ),
     ColorPalette(
       name: 'Midnight Sky',
       icon: '🌌',
       primary: Color(0xFF3F51B5),
       secondary: Color(0xFF3949AB),
-      accent: Color(0xFF7986CB),
+      accent: Color(0xFF9370DB),
       deep: Color(0xFF283593),
-      lightGradient: [Color(0xFF3F51B5), Color(0xFF3949AB)],
-      darkGradient: [Color(0xFF3949AB), Color(0xFF283593)],
+      lightGradient: [Color(0xFF3F51B5), Color(0xFF9370DB)], // Indigo to medium purple
+      darkGradient: [Color(0xFF3949AB), Color(0xFF4B0082)], // Dark slate blue to indigo
     ),
     ColorPalette(
       name: 'Golden Hour',
       icon: '✨',
       primary: Color(0xFFFFC107),
       secondary: Color(0xFFFFB300),
-      accent: Color(0xFFFFD54F),
+      accent: Color(0xFFFF8C00), // Changed to dark orange for better text contrast
       deep: Color(0xFFFF8F00),
-      lightGradient: [Color(0xFFFFC107), Color(0xFFFFB300)],
-      darkGradient: [Color(0xFFFFB300), Color(0xFFFF8F00)],
+      lightGradient: [Color(0xFFFFC107), Color(0xFFFF8C00)], // Amber to dark orange
+      darkGradient: [Color(0xFFFFB300), Color(0xFFDAA520)], // Dark amber to goldenrod
     ),
     ColorPalette(
       name: 'Cherry Blossom',
       icon: '🌸',
       primary: Color(0xFFE91E63),
       secondary: Color(0xFFD81B60),
-      accent: Color(0xFFF48FB1),
+      accent: Color(0xFFFFB6C1),
       deep: Color(0xFFC2185B),
-      lightGradient: [Color(0xFFE91E63), Color(0xFFD81B60)],
-      darkGradient: [Color(0xFFD81B60), Color(0xFFC2185B)],
+      lightGradient: [Color(0xFFE91E63), Color(0xFFFFB6C1)], // Pink to light pink
+      darkGradient: [Color(0xFFD81B60), Color(0xFFDB7093)], // Deep pink to pale violet red
     ),
   ];
 
   // App color palette
   static const Color warningColor = Color(0xFFFF9500);
   static const Color errorColor = Color(0xFFFF3B30);
+  
+  // Static method to get current theme colors synchronously for splash screen
+  static Future<Map<String, Color>> getCurrentThemeColors() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedPaletteIndex = prefs.getInt('color_palette') ?? 0;
+      final selectedPalette = availablePalettes[savedPaletteIndex.clamp(0, availablePalettes.length - 1)];
+      
+      return {
+        'primary': selectedPalette.primary,
+        'secondary': selectedPalette.secondary,
+        'accent': selectedPalette.accent,
+      };
+    } catch (e) {
+      debugPrint('Error loading theme colors: $e');
+      // Return Rose Garden as fallback
+      return {
+        'primary': availablePalettes[0].primary,
+        'secondary': availablePalettes[0].secondary,
+        'accent': availablePalettes[0].accent,
+      };
+    }
+  }
   
   // Getters
   ThemeData get lightTheme => _lightTheme;
@@ -149,6 +172,13 @@ class ThemeService extends ChangeNotifier {
     _darkTheme = _createDarkTheme();
     
     notifyListeners();
+  }
+  
+  // Pre-warm colors for splash screen to prevent gradient flashing
+  Future<void> preWarmColors() async {
+    // This method ensures the selected palette is ready before splash screen renders
+    // The colors are already loaded in initialize(), this is just for confirmation
+    debugPrint('🎨 Pre-warmed colors: Primary=${_selectedPalette.primary}, Accent=${_selectedPalette.accent}');
   }
   
   // Toggle dark mode
