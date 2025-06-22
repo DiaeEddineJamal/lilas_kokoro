@@ -520,14 +520,14 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
   }
 
   Future<void> _handleDeleteConversation(String conversationId) async {
-          setState(() {
+    setState(() {
       _isLoading = true;
     });
     
     try {
       // If we're deleting the current conversation, create a new one first
       if (conversationId == _currentConversationId) {
-      final newConversation = await _aiService.createConversation();
+        final newConversation = await _aiService.createConversation();
         
         // Update the UI with the new conversation
         setState(() {
@@ -538,38 +538,40 @@ class _AICompanionScreenState extends State<AICompanionScreen> with AutomaticKee
           AICompanionScreen._savedConversation = newConversation;
           AICompanionScreen._savedConversationId = newConversation.id;
         });
-  }
+      }
 
-      // Delete the conversation
+      // Delete the conversation from the service
       await _aiService.deleteConversation(conversationId);
       
-      // Reload conversations list
+      // Force refresh the conversations list
       await _aiService.loadConversations();
       
       // Show confirmation
       if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('Conversation deleted'),
-                backgroundColor: Colors.green,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Conversation deleted successfully'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error deleting conversation: $e'),
-                backgroundColor: Colors.red,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting conversation: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -1098,188 +1100,192 @@ class ConversationsDialog extends StatelessWidget {
             
             // Recent conversations list
             Flexible(
-              child: FutureBuilder<List<ChatConversation>>(
-                future: aiService.getConversations(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  
-                  final conversations = snapshot.data ?? [];
-                  
-                  if (conversations.isEmpty) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.chat_bubble_outline,
-                              size: 64,
-                              color: themeService.primary.withOpacity(0.5),
+              child: Consumer<AICompanionService>(
+                builder: (context, aiCompanionService, child) {
+                  return FutureBuilder<List<ChatConversation>>(
+                    future: aiCompanionService.getConversations(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      
+                      final conversations = snapshot.data ?? [];
+                      
+                      if (conversations.isEmpty) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.chat_bubble_outline,
+                                  size: 64,
+                                  color: themeService.primary.withOpacity(0.5),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No conversations yet',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: textColor,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Start a new conversation with your AI companion',
+                                  style: TextStyle(
+                                    color: secondaryTextColor,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                        'No conversations yet',
-                        style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                          ),
+                        );
+                      }
+                      
+                      // Sort conversations by update time (newest first)
+                      conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+                      
+                      // Get unique conversations only to prevent duplication
+                      final uniqueConversations = <String, ChatConversation>{};
+                      for (var conversation in conversations) {
+                        uniqueConversations[conversation.id] = conversation;
+                      }
+                      
+                      return ListView.builder(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shrinkWrap: true,
+                        itemCount: uniqueConversations.length,
+                        itemBuilder: (context, index) {
+                          final conversation = uniqueConversations.values.elementAt(index);
+                          final isSelected = conversation.id == currentConversationId;
+                          
+                          // Format the date
+                          final date = conversation.updatedAt;
+                          final now = DateTime.now();
+                          final today = DateTime(now.year, now.month, now.day);
+                          final conversationDate = DateTime(date.year, date.month, date.day);
+                          
+                          String formattedDate;
+                          if (conversationDate == today) {
+                            // Today, just show time
+                            formattedDate = '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+                          } else {
+                            // Other days, show date
+                            formattedDate = '${date.month}/${date.day}';
+                          }
+                          
+                          return ListTile(
+                            selected: isSelected,
+                            selectedTileColor: themeService.primary.withOpacity(0.1),
+                            leading: CircleAvatar(
+                              backgroundColor: themeService.primary.withOpacity(0.2),
+                              child: const Text('🌸', style: TextStyle(fontSize: 16)),
+                            ),
+                            title: Text(
+                              conversation.title.isEmpty ? 'Conversation ${index + 1}' : conversation.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
                                 color: textColor,
                               ),
-                              textAlign: TextAlign.center,
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Start a new conversation with your AI companion',
+                            subtitle: Text(
+                              conversation.lastMessagePreview,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: secondaryTextColor,
                               ),
-                              textAlign: TextAlign.center,
                             ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-                  
-                  // Sort conversations by update time (newest first)
-                  conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-                  
-                  // Get unique conversations only to prevent duplication
-                  final uniqueConversations = <String, ChatConversation>{};
-                  for (var conversation in conversations) {
-                    uniqueConversations[conversation.id] = conversation;
-                  }
-                  
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    shrinkWrap: true,
-                    itemCount: uniqueConversations.length,
-                    itemBuilder: (context, index) {
-                      final conversation = uniqueConversations.values.elementAt(index);
-                      final isSelected = conversation.id == currentConversationId;
-                      
-                      // Format the date
-                      final date = conversation.updatedAt;
-                      final now = DateTime.now();
-                      final today = DateTime(now.year, now.month, now.day);
-                      final conversationDate = DateTime(date.year, date.month, date.day);
-                      
-                      String formattedDate;
-                      if (conversationDate == today) {
-                        // Today, just show time
-                        formattedDate = '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-                      } else {
-                        // Other days, show date
-                        formattedDate = '${date.month}/${date.day}';
-                      }
-                      
-                      return ListTile(
-                        selected: isSelected,
-                        selectedTileColor: themeService.primary.withOpacity(0.1),
-                        leading: CircleAvatar(
-                                                      backgroundColor: themeService.primary.withOpacity(0.2),
-                          child: const Text('🌸', style: TextStyle(fontSize: 16)),
-                        ),
-                        title: Text(
-                          conversation.title.isEmpty ? 'Conversation ${index + 1}' : conversation.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: textColor,
-                          ),
-                        ),
-                        subtitle: Text(
-                          conversation.lastMessagePreview,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: secondaryTextColor,
-                          ),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                          formattedDate,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: secondaryTextColor,
-                          ),
-                            ),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              icon: Icon(
-                                Icons.delete_outline,
-                                size: 20,
-                                color: secondaryTextColor,
-                              ),
-                              onPressed: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    backgroundColor: isDarkMode ? const Color(0xFF383844) : Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    title: Text(
-                                      'Delete Conversation',
-                                      style: TextStyle(
-                                        color: isDarkMode ? Colors.white : Colors.black87,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    content: Text(
-                                      'Are you sure you want to delete this conversation? This action cannot be undone.',
-                                      style: TextStyle(
-                                        color: isDarkMode ? Colors.white70 : Colors.black54,
-                                      ),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: Text(
-                                          'CANCEL',
-                                          style: TextStyle(
-                                            color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
-                                          ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  formattedDate,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: secondaryTextColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.delete_outline,
+                                    size: 20,
+                                    color: secondaryTextColor,
+                                  ),
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        backgroundColor: isDarkMode ? const Color(0xFF383844) : Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
                                         ),
-                                      ),
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.pop(context); // Close confirmation dialog
-                                          Navigator.pop(context, { // Close main dialog
-                                            'action': 'delete_conversation',
-                                            'conversation_id': conversation.id,
-                                          });
-                                        },
-                                        style: TextButton.styleFrom(
-                                          backgroundColor: Colors.red.shade600,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          'DELETE',
+                                        title: Text(
+                                          'Delete Conversation',
                                           style: TextStyle(
-                                            color: Colors.white,
+                                            color: isDarkMode ? Colors.white : Colors.black87,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
+                                        content: Text(
+                                          'Are you sure you want to delete this conversation? This action cannot be undone.',
+                                          style: TextStyle(
+                                            color: isDarkMode ? Colors.white70 : Colors.black54,
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context),
+                                            child: Text(
+                                              'CANCEL',
+                                              style: TextStyle(
+                                                color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                              ),
+                                            ),
+                                          ),
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.pop(context); // Close confirmation dialog
+                                              Navigator.pop(context, { // Close main dialog
+                                                'action': 'delete_conversation',
+                                                'conversation_id': conversation.id,
+                                              });
+                                            },
+                                            style: TextButton.styleFrom(
+                                              backgroundColor: Colors.red.shade600,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                            ),
+                                            child: const Text(
+                                              'DELETE',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                );
-                              },
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        onTap: () {
-                          Navigator.pop(context, {
-                            'action': 'select_conversation',
-                            'conversation_id': conversation.id,
-                          });
+                            onTap: () {
+                              Navigator.pop(context, {
+                                'action': 'select_conversation',
+                                'conversation_id': conversation.id,
+                              });
+                            },
+                          );
                         },
                       );
                     },

@@ -1,4 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Add queries for Android 11+ URL launching -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
+    </queries>
+    
     <!-- Storage permissions -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
@@ -6,6 +18,9 @@
     
     <!-- Add internet permission -->
     <uses-permission android:name="android.permission.INTERNET" />
+    
+    <!-- Add permission to query all packages for URL launching -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     
     <!-- Media permissions for Android 13+ -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>

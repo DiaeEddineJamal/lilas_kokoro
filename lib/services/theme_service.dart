@@ -84,7 +84,7 @@ class ThemeService extends ChangeNotifier {
     ),
     ColorPalette(
       name: 'Midnight Sky',
-      icon: '🌌',
+      icon: '🌙',
       primary: Color(0xFF3F51B5),
       secondary: Color(0xFF3949AB),
       accent: Color(0xFF9370DB),

@@ -161,16 +161,32 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
   Future<void> _launchGitHub() async {
     final Uri githubUrl = Uri.parse('https://github.com/DiaeEddineJamal');
     try {
-      if (await canLaunchUrl(githubUrl)) {
-        await launchUrl(
+      // First check if the URL can be launched
+      final bool canLaunch = await canLaunchUrl(githubUrl);
+      debugPrint('Can launch GitHub URL: $canLaunch');
+      
+      if (canLaunch) {
+        final bool launched = await launchUrl(
           githubUrl,
           mode: LaunchMode.externalApplication,
         );
+        debugPrint('GitHub URL launched successfully: $launched');
+        
+        if (!launched && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Failed to launch GitHub profile'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       } else {
+        debugPrint('Cannot launch GitHub URL - no suitable app found');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Could not open GitHub profile'),
+              content: const Text('No browser app found to open GitHub profile'),
               backgroundColor: Colors.orange,
               behavior: SnackBarBehavior.floating,
             ),
@@ -178,10 +194,11 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
         }
       }
     } catch (e) {
+      debugPrint('Error launching GitHub URL: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error opening GitHub profile: $e'),
+            content: Text('Error opening GitHub profile: ${e.toString()}'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -538,7 +555,7 @@ class _SettingsScreenState extends State<SettingsScreen> with AutomaticKeepAlive
                                     const Divider(),
                                     ListTile(
                                       title: const Text('Credits'),
-                                      subtitle: const Text('Designed with ❤️ by Diae-Eddine Jamal'),
+                                      subtitle: const Text('© Designed with ❤️ by Luziv'),
                                       leading: const Icon(Icons.favorite),
                                       trailing: const Icon(Icons.open_in_new),
                                       onTap: () => _launchGitHub(),
