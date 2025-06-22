@@ -1,0 +1,21 @@
+Lilas Kokoro is a kawaii (cute) companion app designed to bring joy and organization to your daily life. This privacy-focused, open-source app combines beautiful aesthetics with practical functionality.
+
+✨ Features:
+• Smart Reminders - Set personalized reminders with custom sounds and notifications
+• Love Counter - Track special moments and milestones with your loved ones
+• AI Companion - Chat with an intelligent AI assistant for support and conversation
+• Beautiful Themes - Multiple kawaii themes including Aurora Dream, Midnight Sky, and more
+• Customizable Alarms - Wake up to gentle, customizable alarm sounds
+• Dark/Light Mode - Seamless theme switching for any time of day
+• Privacy-First - All data stored locally on your device
+
+🌸 Design Philosophy:
+Lilas Kokoro embraces Japanese kawaii culture with soft gradients, gentle animations, and an intuitive interface. The app is designed to be your digital companion that respects your privacy while helping you stay organized and connected.
+
+🔒 Privacy & Security:
+• No data collection or tracking
+• All information stored locally
+• No ads or in-app purchases
+• Open source and transparent
+
+Perfect for anyone who loves cute aesthetics, values privacy, and wants a companion app that brings a smile to their daily routine. 

@@ -1,0 +1,12 @@
+🌸 Initial release of Lilas Kokoro!
+
+✨ Features:
+• Smart reminders with custom sounds
+• Love counter for tracking special moments  
+• AI companion for chat and support
+• Beautiful kawaii themes
+• Customizable alarms
+• Dark/light mode support
+• Complete privacy - all data stored locally
+
+Welcome to your new kawaii companion! 💕 
