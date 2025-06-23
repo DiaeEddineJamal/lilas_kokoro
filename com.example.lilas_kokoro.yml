@@ -1,0 +1,35 @@
+Categories:
+  - System
+  - Time
+License: MIT
+AuthorName: Luziv
+AuthorEmail: diae_2002@hotmail.com
+SourceCode: https://github.com/DiaeEddineJamal/lilas_kokoro
+IssueTracker: https://github.com/DiaeEddineJamal/lilas_kokoro/issues
+
+AutoName: Lilas Kokoro
+Summary: A kawaii companion app with reminders & AI chat
+
+RepoType: git
+Repo: https://github.com/DiaeEddineJamal/lilas_kokoro
+
+Builds:
+  - versionName: '1.0.0'
+    versionCode: 1
+    commit: v1.0.0
+    subdir: .
+    sudo:
+      - apt-get update
+      - apt-get install -y openjdk-17-jdk-headless
+      - update-alternatives --auto java
+    gradle:
+      - yes
+    prebuild: flutter/bin/flutter config --no-analytics && flutter/bin/flutter packages get
+    output: build/app/outputs/flutter-apk/app-release.apk
+    srclibs:
+      - flutter@3.24.5
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: '1.0.0'
+CurrentVersionCode: 1 
